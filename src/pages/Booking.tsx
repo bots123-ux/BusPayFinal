@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Loader2, Wallet as WalletIcon, Banknote, Smartphone, Check } from "lucide-react";
+import { ArrowLeft, Loader2, Wallet as WalletIcon, Smartphone, Check } from "lucide-react";
 import { format } from "date-fns";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,7 +10,7 @@ import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
-type Method = "cash" | "gcash" | "wallet";
+type Method = "gcash" | "wallet";
 
 interface TripDetail {
   id: string;
@@ -42,7 +42,7 @@ export default function Booking() {
   const [passengerCount, setPassengerCount] = useState(1);
   const [selectedSeats, setSelectedSeats] = useState<number[]>([]);
   const [step, setStep] = useState<"seat" | "pay" | "done">("seat");
-  const [method, setMethod] = useState<Method>("cash");
+  const [method, setMethod] = useState<Method>("gcash");
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -141,7 +141,7 @@ export default function Booking() {
             user_id: user.id,
             trip_id: trip.id,
             seat_number: seatNum,
-            status: method === "cash" ? "pending" : "paid",
+            status: "paid",
             price_php: price,
           })
           .select("id")
@@ -157,7 +157,7 @@ export default function Booking() {
           ticket_id: ticketRow.id,
           amount_php: price,
           method,
-          status: method === "cash" ? "pending" : "completed",
+          status: "completed",
           reference: method === "gcash" ? `GCASH-${Date.now()}-${seatNum}` : null,
         });
         if (pErr) throw pErr;
@@ -335,13 +335,7 @@ export default function Booking() {
           </div>
 
           <div className="space-y-3">
-            <PayOption
-              icon={<Banknote className="h-5 w-5" />}
-              label={t("pay.cash")}
-              hint="Pay onboard"
-              active={method === "cash"}
-              onClick={() => setMethod("cash")}
-            />
+
             <PayOption
               icon={<Smartphone className="h-5 w-5" />}
               label={t("pay.gcash")}

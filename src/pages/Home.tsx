@@ -43,6 +43,71 @@ function next14Days(): string[] {
   return days;
 }
 
+
+function CalendarPicker({ days, selected, onSelect }: { days: string[]; selected: string; onSelect: (d: string) => void }) {
+  const today = days[0];
+  const firstDay = new Date(today + "T00:00:00");
+  // Get the month/year for the calendar header
+  const monthLabel = format(firstDay, "MMMM yyyy");
+  // Get all days in this month to build the grid
+  const year = firstDay.getFullYear();
+  const month = firstDay.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstWeekday = new Date(year, month, 1).getDay(); // 0=Sun
+  const daySet = new Set(days);
+
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < firstWeekday; i++) cells.push(null);
+  for (let i = 1; i <= daysInMonth; i++) cells.push(i);
+
+  const getISO = (day: number) => {
+    const d = new Date(year, month, day);
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 10);
+  };
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4 shadow-soft">
+      <div className="mb-3 text-center text-sm font-bold text-foreground">{monthLabel}</div>
+      <div className="mb-2 grid grid-cols-7 text-center">
+        {["Su","Mo","Tu","We","Th","Fr","Sa"].map(d => (
+          <div key={d} className="text-[10px] font-semibold uppercase text-muted-foreground py-1">{d}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {cells.map((day, i) => {
+          if (!day) return <div key={`empty-${i}`} />;
+          const iso = getISO(day);
+          const isSelectable = daySet.has(iso);
+          const isSelected = iso === selected;
+          const isToday = iso === days[0];
+          return (
+            <button
+              key={iso}
+              type="button"
+              disabled={!isSelectable}
+              onClick={() => onSelect(iso)}
+              className={cn(
+                "relative flex h-9 w-full items-center justify-center rounded-xl text-sm font-semibold transition-all",
+                isSelected && "bg-gradient-hero text-primary-foreground shadow-navy",
+                !isSelected && isSelectable && "hover:bg-accent/10 hover:text-primary text-foreground",
+                !isSelected && isToday && isSelectable && "border-2 border-accent text-accent",
+                !isSelectable && "text-muted-foreground/30 cursor-not-allowed",
+              )}
+            >
+              {day}
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-3 flex items-center gap-4 justify-center text-[10px] text-muted-foreground">
+        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-accent inline-block"/>Available</span>
+        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-gradient-hero inline-block"/>Selected</span>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const { user } = useAuth();
   const { t } = useI18n();
@@ -168,37 +233,12 @@ export default function Home() {
         )}
       </section>
 
-      {/* Date picker */}
+      {/* Date picker — calendar grid */}
       <section className="mb-6">
         <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-muted-foreground">
           <Calendar className="h-4 w-4" /> {t("home.date")}
         </h2>
-        <div className="-mx-5 overflow-x-auto px-5 pb-1">
-          <div className="flex gap-2">
-            {days.map((d) => {
-              const dt = new Date(d + "T00:00:00");
-              const active = d === date;
-              return (
-                <button
-                  key={d}
-                  onClick={() => setDate(d)}
-                  className={cn(
-                    "flex h-20 w-16 flex-shrink-0 flex-col items-center justify-center rounded-2xl border-2 transition-all",
-                    active
-                      ? "border-accent bg-gradient-hero text-primary-foreground shadow-navy"
-                      : "border-border bg-card hover:border-accent/40",
-                  )}
-                >
-                  <span className={cn("text-[10px] font-semibold uppercase", active ? "text-accent" : "text-muted-foreground")}>
-                    {format(dt, "EEE")}
-                  </span>
-                  <span className="text-xl font-extrabold">{format(dt, "d")}</span>
-                  <span className={cn("text-[10px]", active ? "text-accent" : "text-muted-foreground")}>{format(dt, "MMM")}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        <CalendarPicker days={days} selected={date} onSelect={setDate} />
       </section>
 
       {/* Time slots */}

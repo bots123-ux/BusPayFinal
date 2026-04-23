@@ -244,7 +244,7 @@ export default function Auth() {
                   <Input id="password" type={showPassword ? "text" : "password"}
                     autoComplete={mode === "signup" ? "new-password" : "current-password"}
                     value={password} onChange={(e) => setPassword(e.target.value)}
-                    maxLength={128} required className="h-12 rounded-xl pl-10 pr-10" placeholder="••••••••" />
+                    maxLength={128} required className="h-12 rounded-xl pl-10 pr-10" placeholder="••••••••" style={{WebkitAppearance:"none"}} />
                   <button type="button"
                     onMouseDown={(e) => { e.preventDefault(); setShowPassword(p => !p); }}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none">

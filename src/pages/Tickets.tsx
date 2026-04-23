@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { useLocation } from "react-router-dom";
+
 import { format } from "date-fns";
 import { ArrowRight, Ticket as TicketIcon, QrCode } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
@@ -53,12 +55,12 @@ export default function Tickets() {
     }
   };
 
+  // Reload every time this page becomes visible
   useEffect(() => {
     mountedRef.current = true;
-    load();
+    load(); // Always fetch fresh on mount
 
     if (!user) return;
-    // Realtime: new ticket inserted → refresh list
     const ch = supabase
       .channel(`tickets-list-${user.id}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "ticket", filter: `user_id=eq.${user.id}` }, load)
@@ -70,7 +72,14 @@ export default function Tickets() {
       supabase.removeChannel(ch);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, []); // Empty deps = run on every mount
+
+  // Also reload when navigating back to this tab
+  const location = useLocation();
+  useEffect(() => {
+    if (user) load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key]);
 
   const now = new Date();
   const isUpcoming = (tr: TicketRow) => {
