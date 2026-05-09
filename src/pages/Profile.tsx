@@ -200,14 +200,37 @@ export default function Profile() {
   );
 }
 
+
+const IOS_STEPS = [
+  { step: "1", text: "Open BusPay in Safari (not Chrome)" },
+  { step: "2", text: "Tap the Share button at the bottom of Safari" },
+  { step: "3", text: "Scroll down and tap Add to Home Screen" },
+  { step: "4", text: "Tap Add — BusPay will appear on your home screen!" },
+];
+
+const ANDROID_STEPS = [
+  { step: "1", text: "Open BusPay in Chrome" },
+  { step: "2", text: "Tap the three-dot menu in the top-right corner" },
+  { step: "3", text: "Tap Add to Home screen or Install app" },
+  { step: "4", text: "Tap Add or Install — BusPay will appear on your home screen!" },
+];
+
+const DESKTOP_STEPS = [
+  { step: "1", text: "Look for the install icon in your browser address bar" },
+  { step: "2", text: "Click Install BusPay" },
+  { step: "3", text: "BusPay will open as a standalone app!" },
+];
+
 function DownloadAppSection() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [installed, setInstalled] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
+
   const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
   const isAndroid = /android/i.test(navigator.userAgent);
-  const isInStandaloneMode = window.matchMedia("(display-mode: standalone)").matches
-    || (window.navigator as any).standalone === true;
+  const isInStandaloneMode =
+    window.matchMedia("(display-mode: standalone)").matches ||
+    (window.navigator as any).standalone === true;
 
   useEffect(() => {
     if (isInStandaloneMode) { setInstalled(true); return; }
@@ -228,13 +251,17 @@ function DownloadAppSection() {
     }
   };
 
-  if (installed) return (
-    <div className="rounded-2xl border border-success/30 bg-success/5 p-4 text-center">
-      <div className="text-2xl mb-1">✅</div>
-      <div className="font-bold text-success text-sm">BusPay is installed!</div>
-      <div className="text-xs text-muted-foreground">Find it on your home screen.</div>
-    </div>
-  );
+  if (installed) {
+    return (
+      <div className="rounded-2xl border border-success/30 bg-success/5 p-4 text-center">
+        <div className="text-2xl mb-1">✅</div>
+        <div className="font-bold text-success text-sm">BusPay is installed!</div>
+        <div className="text-xs text-muted-foreground">Find it on your home screen.</div>
+      </div>
+    );
+  }
+
+  const steps = isIos ? IOS_STEPS : isAndroid ? ANDROID_STEPS : DESKTOP_STEPS;
 
   return (
     <>
@@ -245,16 +272,22 @@ function DownloadAppSection() {
           </div>
           <div>
             <div className="font-extrabold">Download Our App</div>
-            <div className="text-xs text-muted-foreground">BusPay • Online Ticketing</div>
+            <div className="text-xs text-muted-foreground">BusPay · Online Ticketing</div>
           </div>
         </div>
         <p className="text-xs text-muted-foreground mb-4">
-          Install BusPay on your phone for a faster, full-screen experience — works like a native app on both iOS and Android.
+          Install BusPay on your phone for a faster, full-screen experience — works like a native app on both iOS and Android. Free, no app store needed.
         </p>
-        <div className="flex gap-2 mb-3">
-          <div className="flex items-center gap-1 rounded-xl bg-secondary px-3 py-1.5 text-xs font-semibold"><Smartphone className="h-3 w-3" /> iOS</div>
-          <div className="flex items-center gap-1 rounded-xl bg-secondary px-3 py-1.5 text-xs font-semibold"><Smartphone className="h-3 w-3" /> Android</div>
-          <div className="flex items-center gap-1 rounded-xl bg-secondary px-3 py-1.5 text-xs font-semibold">Free</div>
+        <div className="flex gap-2 mb-4">
+          <div className="flex items-center gap-1 rounded-xl bg-secondary px-3 py-1.5 text-xs font-semibold">
+            <Smartphone className="h-3 w-3" /> iOS
+          </div>
+          <div className="flex items-center gap-1 rounded-xl bg-secondary px-3 py-1.5 text-xs font-semibold">
+            <Smartphone className="h-3 w-3" /> Android
+          </div>
+          <div className="flex items-center gap-1 rounded-xl bg-secondary px-3 py-1.5 text-xs font-semibold">
+            Free
+          </div>
         </div>
         <button
           onClick={handleInstall}
@@ -264,67 +297,39 @@ function DownloadAppSection() {
         </button>
       </div>
 
-      {/* Manual instructions modal */}
       {showInstructions && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowInstructions(false)}>
-          <div className="w-full max-w-md rounded-t-3xl bg-card p-6 shadow-elevated" onClick={(e) => e.stopPropagation()}>
-            <h3 className="mb-4 text-xl font-extrabold">Install BusPay</h3>
-
-            {isIos && (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">On iPhone or iPad:</p>
-                {[
-                  { step: "1", text: "Tap the Share button (□↑) at the bottom of Safari" },
-                  { step: "2", text: "Scroll down and tap "Add to Home Screen"" },
-                  { step: "3", text: "Tap "Add" in the top-right corner" },
-                  { step: "4", text: "BusPay will appear on your home screen!" },
-                ].map(({ step, text }) => (
-                  <div key={step} className="flex items-start gap-3 text-sm">
-                    <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground text-xs font-bold">{step}</span>
-                    <span>{text}</span>
-                  </div>
-                ))}
-                <div className="mt-3 flex items-center gap-2 rounded-xl bg-secondary p-3 text-xs text-muted-foreground">
-                  <Share className="h-4 w-4 flex-shrink-0" /> Make sure you're using Safari — other browsers don't support installation on iOS.
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm"
+          onClick={() => setShowInstructions(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-t-3xl bg-card p-6 shadow-elevated"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="mb-1 text-xl font-extrabold">Install BusPay</h3>
+            <p className="mb-4 text-sm text-muted-foreground">
+              {isIos ? "On iPhone or iPad:" : isAndroid ? "On Android:" : "On your browser:"}
+            </p>
+            <div className="space-y-3">
+              {steps.map(({ step, text }) => (
+                <div key={step} className="flex items-start gap-3 text-sm">
+                  <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground text-xs font-bold">
+                    {step}
+                  </span>
+                  <span>{text}</span>
                 </div>
+              ))}
+            </div>
+            {isIos && (
+              <div className="mt-4 flex items-center gap-2 rounded-xl bg-secondary p-3 text-xs text-muted-foreground">
+                <Share className="h-4 w-4 flex-shrink-0" />
+                Make sure you are using Safari — other browsers do not support installation on iOS.
               </div>
             )}
-
-            {isAndroid && !deferredPrompt && (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">On Android:</p>
-                {[
-                  { step: "1", text: "Tap the ⋮ menu button in Chrome (top-right)" },
-                  { step: "2", text: "Tap "Add to Home screen" or "Install app"" },
-                  { step: "3", text: "Tap "Add" or "Install" to confirm" },
-                  { step: "4", text: "BusPay will appear on your home screen!" },
-                ].map(({ step, text }) => (
-                  <div key={step} className="flex items-start gap-3 text-sm">
-                    <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground text-xs font-bold">{step}</span>
-                    <span>{text}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {!isIos && !isAndroid && (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">On your desktop browser:</p>
-                {[
-                  { step: "1", text: "Look for the install icon (⊕) in your browser's address bar" },
-                  { step: "2", text: "Click "Install BusPay"" },
-                  { step: "3", text: "BusPay will open as a standalone app!" },
-                ].map(({ step, text }) => (
-                  <div key={step} className="flex items-start gap-3 text-sm">
-                    <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground text-xs font-bold">{step}</span>
-                    <span>{text}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <button onClick={() => setShowInstructions(false)}
-              className="mt-5 w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground">
+            <button
+              onClick={() => setShowInstructions(false)}
+              className="mt-5 w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground"
+            >
               Got it!
             </button>
           </div>
