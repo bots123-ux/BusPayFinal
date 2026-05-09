@@ -1,3 +1,2 @@
-# Welcome to your Lovable project
-
+# Welcome to BusPay, online booking ticket
 TODO: Document your project here
