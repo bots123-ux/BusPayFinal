@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { LogOut, Loader2, Globe, User as UserIcon, Mail, Phone, FileText, HelpCircle, CreditCard, MapPin, ChevronRight } from "lucide-react";
+import { LogOut, Loader2, Globe, User as UserIcon, Mail, Phone, FileText, HelpCircle, CreditCard, MapPin, ChevronRight, Download, Smartphone, Share } from "lucide-react";
 import { Link } from "react-router-dom";
 import { z } from "zod";
 import { useAuth } from "@/lib/auth";
@@ -186,6 +186,9 @@ export default function Profile() {
             ))}
           </section>
 
+          {/* Download App */}
+          <DownloadAppSection />
+
           <Button variant="outline" size="lg" className="mt-2 w-full text-destructive hover:bg-destructive/5" onClick={handleLogout}>
             <LogOut className="h-4 w-4" /> {t("profile.logout")}
           </Button>
@@ -194,5 +197,139 @@ export default function Profile() {
         </>
       )}
     </div>
+  );
+}
+
+function DownloadAppSection() {
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [installed, setInstalled] = useState(false);
+  const [showInstructions, setShowInstructions] = useState(false);
+  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isAndroid = /android/i.test(navigator.userAgent);
+  const isInStandaloneMode = window.matchMedia("(display-mode: standalone)").matches
+    || (window.navigator as any).standalone === true;
+
+  useEffect(() => {
+    if (isInStandaloneMode) { setInstalled(true); return; }
+    const handler = (e: any) => { e.preventDefault(); setDeferredPrompt(e); };
+    window.addEventListener("beforeinstallprompt", handler);
+    window.addEventListener("appinstalled", () => setInstalled(true));
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === "accepted") setInstalled(true);
+      setDeferredPrompt(null);
+    } else {
+      setShowInstructions(true);
+    }
+  };
+
+  if (installed) return (
+    <div className="rounded-2xl border border-success/30 bg-success/5 p-4 text-center">
+      <div className="text-2xl mb-1">✅</div>
+      <div className="font-bold text-success text-sm">BusPay is installed!</div>
+      <div className="text-xs text-muted-foreground">Find it on your home screen.</div>
+    </div>
+  );
+
+  return (
+    <>
+      <div className="overflow-hidden rounded-2xl border-2 border-accent/40 bg-gradient-to-br from-accent/10 to-primary/5 p-5">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary">
+            <img src="/icons/icon-96x96.png" alt="BusPay" className="h-10 w-10 rounded-xl" />
+          </div>
+          <div>
+            <div className="font-extrabold">Download Our App</div>
+            <div className="text-xs text-muted-foreground">BusPay • Online Ticketing</div>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground mb-4">
+          Install BusPay on your phone for a faster, full-screen experience — works like a native app on both iOS and Android.
+        </p>
+        <div className="flex gap-2 mb-3">
+          <div className="flex items-center gap-1 rounded-xl bg-secondary px-3 py-1.5 text-xs font-semibold"><Smartphone className="h-3 w-3" /> iOS</div>
+          <div className="flex items-center gap-1 rounded-xl bg-secondary px-3 py-1.5 text-xs font-semibold"><Smartphone className="h-3 w-3" /> Android</div>
+          <div className="flex items-center gap-1 rounded-xl bg-secondary px-3 py-1.5 text-xs font-semibold">Free</div>
+        </div>
+        <button
+          onClick={handleInstall}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition-colors"
+        >
+          <Download className="h-4 w-4" /> Install BusPay App
+        </button>
+      </div>
+
+      {/* Manual instructions modal */}
+      {showInstructions && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowInstructions(false)}>
+          <div className="w-full max-w-md rounded-t-3xl bg-card p-6 shadow-elevated" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mb-4 text-xl font-extrabold">Install BusPay</h3>
+
+            {isIos && (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">On iPhone or iPad:</p>
+                {[
+                  { step: "1", text: "Tap the Share button (□↑) at the bottom of Safari" },
+                  { step: "2", text: "Scroll down and tap "Add to Home Screen"" },
+                  { step: "3", text: "Tap "Add" in the top-right corner" },
+                  { step: "4", text: "BusPay will appear on your home screen!" },
+                ].map(({ step, text }) => (
+                  <div key={step} className="flex items-start gap-3 text-sm">
+                    <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground text-xs font-bold">{step}</span>
+                    <span>{text}</span>
+                  </div>
+                ))}
+                <div className="mt-3 flex items-center gap-2 rounded-xl bg-secondary p-3 text-xs text-muted-foreground">
+                  <Share className="h-4 w-4 flex-shrink-0" /> Make sure you're using Safari — other browsers don't support installation on iOS.
+                </div>
+              </div>
+            )}
+
+            {isAndroid && !deferredPrompt && (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">On Android:</p>
+                {[
+                  { step: "1", text: "Tap the ⋮ menu button in Chrome (top-right)" },
+                  { step: "2", text: "Tap "Add to Home screen" or "Install app"" },
+                  { step: "3", text: "Tap "Add" or "Install" to confirm" },
+                  { step: "4", text: "BusPay will appear on your home screen!" },
+                ].map(({ step, text }) => (
+                  <div key={step} className="flex items-start gap-3 text-sm">
+                    <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground text-xs font-bold">{step}</span>
+                    <span>{text}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {!isIos && !isAndroid && (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">On your desktop browser:</p>
+                {[
+                  { step: "1", text: "Look for the install icon (⊕) in your browser's address bar" },
+                  { step: "2", text: "Click "Install BusPay"" },
+                  { step: "3", text: "BusPay will open as a standalone app!" },
+                ].map(({ step, text }) => (
+                  <div key={step} className="flex items-start gap-3 text-sm">
+                    <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground text-xs font-bold">{step}</span>
+                    <span>{text}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button onClick={() => setShowInstructions(false)}
+              className="mt-5 w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground">
+              Got it!
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
