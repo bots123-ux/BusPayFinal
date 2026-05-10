@@ -18,6 +18,7 @@ const STATUS_COLORS: Record<string, string> = {
   used: "bg-blue-500/15 text-blue-400",
   cancelled: "bg-red-500/15 text-red-400",
   expired: "bg-slate-500/15 text-slate-400",
+  boarded: "bg-blue-500/15 text-blue-400",
 };
 
 export default function AdminTickets() {

@@ -20,8 +20,8 @@ interface TicketRow {
   trips: {
     travel_date: string;
     departure_time: string;
-    routes: { origin: string; destination: string };
-  };
+    routes: { origin: string; destination: string } | null;
+  } | null;
 }
 
 const STATUS_STYLE: Record<string, string> = {
@@ -30,6 +30,7 @@ const STATUS_STYLE: Record<string, string> = {
   used:      "bg-secondary text-muted-foreground",
   cancelled: "bg-destructive/10 text-destructive",
   expired:   "bg-secondary text-muted-foreground",
+  boarded:   "bg-blue-500/15 text-blue-400",
 };
 
 export default function Tickets() {
@@ -54,26 +55,22 @@ export default function Tickets() {
     }
   };
 
-  // Reload every time this page becomes visible
   useEffect(() => {
     mountedRef.current = true;
-    load(); // Always fetch fresh on mount
-
+    load();
     if (!user) return;
     const ch = supabase
       .channel(`tickets-list-${user.id}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "ticket", filter: `user_id=eq.${user.id}` }, load)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "ticket", filter: `user_id=eq.${user.id}` }, load)
       .subscribe();
-
     return () => {
       mountedRef.current = false;
       supabase.removeChannel(ch);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty deps = run on every mount
+  }, []);
 
-  // Also reload when navigating back to this tab
   const location = useLocation();
   useEffect(() => {
     if (user) load();
@@ -81,9 +78,16 @@ export default function Tickets() {
   }, [location.key]);
 
   const now = new Date();
+
+  // Safe check — guard against null trips
   const isUpcoming = (tr: TicketRow) => {
-    const dep = new Date(`${tr.trips.travel_date}T${tr.trips.departure_time}`);
-    return dep.getTime() >= now.getTime() && tr.status !== "cancelled";
+    if (!tr.trips) return false;
+    try {
+      const dep = new Date(`${tr.trips.travel_date}T${tr.trips.departure_time}`);
+      return dep.getTime() >= now.getTime() && tr.status !== "cancelled";
+    } catch {
+      return false;
+    }
   };
 
   const upcoming = tickets.filter(isUpcoming);
@@ -128,44 +132,55 @@ export default function Tickets() {
         <EmptyState
           illustration={<EmptyTicketIllustration />}
           title={t("tickets.empty")}
-          description="Book a Manila to Baguio trip to get started."
+          description="Book a trip to get started."
           action={<Button asChild variant="navy" size="lg"><Link to="/app">{t("home.book")}</Link></Button>}
         />
       ) : (
         <div className="space-y-4">
-          {list.map((tr, i) => (
-            <Link key={tr.id} to={`/app/tickets/${tr.id}`}
-              className="group block animate-slide-up"
-              style={{ animationDelay: `${i * 40}ms` }}>
-              <article className="overflow-hidden rounded-2xl bg-gradient-ticket text-primary-foreground shadow-navy transition-transform group-hover:-translate-y-0.5">
-                <div className="flex items-center justify-between p-5">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-accent">
-                      {format(new Date(tr.trips.travel_date + "T00:00:00"), "EEE, d MMM")} · {formatTime12h(tr.trips.departure_time)}
-                    </p>
-                    <div className="mt-1 flex items-center gap-2 text-xl font-bold">
-                      <span>{tr.trips.routes.origin}</span>
-                      <ArrowRight className="h-4 w-4 text-accent" />
-                      <span>{tr.trips.routes.destination}</span>
-                    </div>
-                  </div>
-                  <QrCode className="h-8 w-8 text-accent/70" />
-                </div>
-                <div className="border-t border-dashed border-primary-foreground/20 px-5 py-4">
-                  <div className="flex items-center justify-between text-sm">
-                    <Field label="Seat" value={`#${tr.seat_number}`} />
+          {list.map((tr, i) => {
+            // Safe access with fallbacks
+            const origin = tr.trips?.routes?.origin ?? "—";
+            const destination = tr.trips?.routes?.destination ?? "—";
+            const travelDate = tr.trips?.travel_date;
+            const departureTime = tr.trips?.departure_time;
+
+            return (
+              <Link key={tr.id} to={`/app/tickets/${tr.id}`}
+                className="group block animate-slide-up"
+                style={{ animationDelay: `${i * 40}ms` }}>
+                <article className="overflow-hidden rounded-2xl bg-gradient-ticket text-primary-foreground shadow-navy transition-transform group-hover:-translate-y-0.5">
+                  <div className="flex items-center justify-between p-5">
                     <div>
-                      <div className="text-[10px] uppercase tracking-wider text-primary-foreground/60 mb-1">Status</div>
-                      <span className={cn("rounded-full px-2 py-0.5 text-xs font-bold capitalize", STATUS_STYLE[tr.status] ?? "bg-secondary text-muted-foreground")}>
-                        {tr.status}
-                      </span>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-accent">
+                        {travelDate
+                          ? format(new Date(travelDate + "T00:00:00"), "EEE, d MMM")
+                          : "—"
+                        }{departureTime ? ` · ${formatTime12h(departureTime)}` : ""}
+                      </p>
+                      <div className="mt-1 flex items-center gap-2 text-xl font-bold">
+                        <span>{origin}</span>
+                        <ArrowRight className="h-4 w-4 text-accent" />
+                        <span>{destination}</span>
+                      </div>
                     </div>
-                    <Field label="Total" value={`₱${Number(tr.price_php).toLocaleString()}`} />
+                    <QrCode className="h-8 w-8 text-accent/70" />
                   </div>
-                </div>
-              </article>
-            </Link>
-          ))}
+                  <div className="border-t border-dashed border-primary-foreground/20 px-5 py-4">
+                    <div className="flex items-center justify-between text-sm">
+                      <Field label="Seat" value={`#${tr.seat_number}`} />
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wider text-primary-foreground/60 mb-1">Status</div>
+                        <span className={cn("rounded-full px-2 py-0.5 text-xs font-bold capitalize", STATUS_STYLE[tr.status] ?? "bg-secondary text-muted-foreground")}>
+                          {tr.status}
+                        </span>
+                      </div>
+                      <Field label="Total" value={`₱${Number(tr.price_php).toLocaleString()}`} />
+                    </div>
+                  </div>
+                </article>
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>

@@ -30,6 +30,9 @@ import AdminPayments from "./pages/admin/AdminPayments";
 import AdminFleet from "./pages/admin/AdminFleet";
 import AdminRoutes from "./pages/admin/AdminRoutes";
 import { AdminGuard } from "./components/admin/AdminGuard";
+import { ScannerGuard } from "./components/scanner/ScannerGuard";
+import ScannerHome from "./pages/scanner/ScannerHome";
+import ScannerLogin from "./pages/scanner/ScannerLogin";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -77,6 +80,8 @@ const App = () => (
                 <Route path="fleet" element={<AdminFleet />} />
                 <Route path="routes" element={<AdminRoutes />} />
               </Route>
+              <Route path="/scanner/login" element={<ScannerLogin />} />
+              <Route path="/scanner" element={<ScannerGuard><ScannerHome /></ScannerGuard>} />
             </Routes>
           </BrowserRouter>
         </AuthProvider>
