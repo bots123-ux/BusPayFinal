@@ -21,6 +21,15 @@ import FAQ from "./pages/FAQ";
 import PaymentMethods from "./pages/PaymentMethods";
 import RouteMap from "./pages/RouteMap";
 import NotFound from "./pages/NotFound.tsx";
+import AdminLayout from "./pages/admin/AdminLayout";
+import AdminOverview from "./pages/admin/AdminOverview";
+import AdminUsers from "./pages/admin/AdminUsers";
+import AdminTrips from "./pages/admin/AdminTrips";
+import AdminTickets from "./pages/admin/AdminTickets";
+import AdminPayments from "./pages/admin/AdminPayments";
+import AdminFleet from "./pages/admin/AdminFleet";
+import AdminRoutes from "./pages/admin/AdminRoutes";
+import { AdminGuard } from "./components/admin/AdminGuard";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -59,6 +68,15 @@ const App = () => (
                 <Route path="route-map" element={<RouteMap />} />
               </Route>
               <Route path="*" element={<NotFound />} />
+              <Route path="/admin" element={<AdminGuard><AdminLayout /></AdminGuard>}>
+                <Route index element={<AdminOverview />} />
+                <Route path="users" element={<AdminUsers />} />
+                <Route path="trips" element={<AdminTrips />} />
+                <Route path="tickets" element={<AdminTickets />} />
+                <Route path="payments" element={<AdminPayments />} />
+                <Route path="fleet" element={<AdminFleet />} />
+                <Route path="routes" element={<AdminRoutes />} />
+              </Route>
             </Routes>
           </BrowserRouter>
         </AuthProvider>
