@@ -1,13 +1,12 @@
 {
-  "name": "BusPay Scanner",
-  "short_name": "BP Scanner",
-  "description": "QR ticket scanner for BusPay bus drivers.",
+  "name": "QR Reader — BusPay",
+  "short_name": "QR Reader",
+  "description": "Scan BusPay tickets and confirm passenger boarding.",
   "start_url": "/scanner",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0f172a",
-  "theme_color": "#0f172a",
-  "scope": "/scanner",
+  "background_color": "#0a0f28",
+  "theme_color": "#0a0f28",
   "icons": [
     { "src": "/scanner-icons/icon-72x72.png",   "sizes": "72x72",   "type": "image/png", "purpose": "any maskable" },
     { "src": "/scanner-icons/icon-96x96.png",   "sizes": "96x96",   "type": "image/png", "purpose": "any maskable" },
