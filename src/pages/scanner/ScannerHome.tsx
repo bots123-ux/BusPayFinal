@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle2, XCircle, RotateCcw, User, MapPin, Calendar, Clock, Armchair, ArrowLeft } from "lucide-react";
+import { ArrowLeft, CheckCircle2, RotateCcw, XCircle } from "lucide-react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats, type Html5QrcodeCameraScanConfig } from "html5-qrcode";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
 type ScanResult = {
@@ -16,10 +15,19 @@ type ScanResult = {
   destination?: string;
   travel_date?: string;
   departure?: string;
+  scanned_at?: string;
 };
 
-type Phase = "scanning" | "processing" | "result";
+type RecentScan = {
+  ticket_id: string;
+  passenger: string;
+  origin: string;
+  destination: string;
+  seat: number;
+  scanned_at: string;
+};
 
+type Phase = "scanning" | "processing" | "failed";
 type ScanPayload = Record<string, unknown>;
 
 type TicketDetailsRow = {
@@ -38,6 +46,7 @@ type TicketDetailsRow = {
 };
 
 const QR_DIV = "bp-qr-reader";
+const RECENT_SCANS_KEY = "buspay:scanner:recent-scans";
 
 const SCAN_CONFIG: Html5QrcodeCameraScanConfig = {
   fps: 12,
@@ -51,6 +60,23 @@ const SCAN_CONFIG: Html5QrcodeCameraScanConfig = {
 
 function firstRelation<T>(value: T | T[] | null | undefined): T | undefined {
   return Array.isArray(value) ? value[0] : value ?? undefined;
+}
+
+function asPayload(payload: unknown): ScanPayload {
+  return typeof payload === "object" && payload !== null ? (payload as ScanPayload) : {};
+}
+
+function stringValue(value: unknown) {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function numberValue(value: unknown) {
+  if (typeof value === "number") return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
 }
 
 function isPermissionDenied(error: unknown) {
@@ -73,30 +99,13 @@ function getCameraErrorMessage(error: unknown) {
     return "Camera access requires HTTPS. Open the scanner from your secure website URL.";
   }
 
-  return "Could not open camera. Make sure the camera is not in use, then reload the scanner.";
+  return "Could not open camera. Make sure the camera is not in use, then try again.";
 }
 
-function isMissingDriverScanRpc(error: unknown) {
+function isMissingRpc(error: unknown, functionName: string) {
   const err = error as { code?: string; message?: string; details?: string };
   const text = `${err?.message ?? ""} ${err?.details ?? ""}`;
-  return err?.code === "PGRST202" || /driver_scan_qr|could not find.*function|function .* does not exist/i.test(text);
-}
-
-function asPayload(payload: unknown): ScanPayload {
-  return typeof payload === "object" && payload !== null ? (payload as ScanPayload) : {};
-}
-
-function stringValue(value: unknown) {
-  return typeof value === "string" && value.length > 0 ? value : undefined;
-}
-
-function numberValue(value: unknown) {
-  if (typeof value === "number") return value;
-  if (typeof value === "string" && value.trim()) {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : undefined;
-  }
-  return undefined;
+  return err?.code === "PGRST202" || text.includes(functionName) || /could not find.*function|function .* does not exist/i.test(text);
 }
 
 function errorMessage(error: unknown) {
@@ -105,6 +114,11 @@ function errorMessage(error: unknown) {
     return String((error as { message?: unknown }).message);
   }
   return "Scan failed. Please try again.";
+}
+
+function extractTicketId(qrValue: string) {
+  const [, ticketId] = qrValue.split("BUSPAY:");
+  return ticketId?.trim() || undefined;
 }
 
 function normalizeScanResult(payload: unknown): ScanResult {
@@ -121,6 +135,34 @@ function normalizeScanResult(payload: unknown): ScanResult {
     destination: stringValue(record.destination),
     travel_date: stringValue(record.travel_date),
     departure: stringValue(record.departure) ?? stringValue(record.departure_time),
+    scanned_at: stringValue(record.scanned_at) ?? stringValue(record.boarded_at),
+  };
+}
+
+function readRecentScans(): RecentScan[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(RECENT_SCANS_KEY) ?? "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeRecentScan(scan: RecentScan) {
+  const current = readRecentScans().filter((item) => item.ticket_id !== scan.ticket_id);
+  localStorage.setItem(RECENT_SCANS_KEY, JSON.stringify([scan, ...current].slice(0, 50)));
+}
+
+function toRecentScan(result: ScanResult): RecentScan | null {
+  if (!result.ticket_id) return null;
+
+  return {
+    ticket_id: result.ticket_id,
+    passenger: result.passenger ?? "Passenger",
+    origin: result.origin ?? "-",
+    destination: result.destination ?? "-",
+    seat: result.seat ?? 0,
+    scanned_at: result.scanned_at ?? new Date().toISOString(),
   };
 }
 
@@ -131,8 +173,7 @@ export default function ScannerHome() {
   const mountedRef = useRef(false);
   const startingRef = useRef(false);
   const [phase, setPhase] = useState<Phase>("scanning");
-  const [result, setResult] = useState<ScanResult | null>(null);
-  const [scanCount, setScanCount] = useState(0);
+  const [failure, setFailure] = useState<string | null>(null);
   const [camError, setCamError] = useState<string | null>(null);
 
   const stopScanner = useCallback(async () => {
@@ -142,14 +183,14 @@ export default function ScannerHome() {
     try {
       if (scanner.isScanning) await scanner.stop();
     } catch {
-      // The library can throw if the browser already closed the stream.
+      // Browser streams may already be closed when the page changes.
     }
   }, []);
 
   const loadTicketDetails = useCallback(async (ticketId: string): Promise<Partial<ScanResult>> => {
     const { data } = await supabase
       .from("ticket")
-      .select("id, user_id, seat_number, status, trips(travel_date, departure_time, routes(origin, destination))")
+      .select("id, user_id, seat_number, trips(travel_date, departure_time, routes(origin, destination))")
       .eq("id", ticketId)
       .maybeSingle();
 
@@ -178,14 +219,36 @@ export default function ScannerHome() {
     };
   }, []);
 
+  const markTicketUsedBestEffort = useCallback(async (ticketId: string) => {
+    await supabase
+      .from("ticket")
+      .update({ status: "used" } as never)
+      .eq("id", ticketId)
+      .then(() => undefined);
+  }, []);
+
   const scanWithValidation = useCallback(async (qrValue: string): Promise<ScanResult> => {
+    const scannedAt = new Date().toISOString();
+    const fallbackTicketId = extractTicketId(qrValue);
     const driverScan = await supabase.rpc("driver_scan_qr" as never, { p_qr_code: qrValue } as never);
 
     if (!driverScan.error) {
-      return normalizeScanResult(driverScan.data);
+      const driverResult = normalizeScanResult(driverScan.data);
+      if (!driverResult.success) return driverResult;
+
+      const ticketId = driverResult.ticket_id ?? fallbackTicketId;
+      const details = ticketId ? await loadTicketDetails(ticketId) : {};
+      if (ticketId) await markTicketUsedBestEffort(ticketId);
+
+      return {
+        ...details,
+        ...driverResult,
+        ticket_id: ticketId,
+        scanned_at: driverResult.scanned_at ?? scannedAt,
+      };
     }
 
-    if (!isMissingDriverScanRpc(driverScan.error)) {
+    if (!isMissingRpc(driverScan.error, "driver_scan_qr")) {
       throw driverScan.error;
     }
 
@@ -196,36 +259,39 @@ export default function ScannerHome() {
     if (!validation.success) return validation;
 
     if (asPayload(data).status === "used") {
-      return { success: false, reason: "Ticket has already been used", ticket_id: validation.ticket_id };
+      return { success: false, reason: "Ticket has already been scanned", ticket_id: validation.ticket_id ?? fallbackTicketId };
     }
 
-    if (!validation.ticket_id) {
+    const ticketId = validation.ticket_id ?? fallbackTicketId;
+    if (!ticketId) {
       return { success: false, reason: "Ticket validated, but no ticket id was returned." };
     }
 
-    const details = await loadTicketDetails(validation.ticket_id);
-
-    await supabase
-      .from("ticket")
-      .update({ status: "used" } as never)
-      .eq("id", validation.ticket_id)
-      .eq("status", "paid");
+    const details = await loadTicketDetails(ticketId);
+    await markTicketUsedBestEffort(ticketId);
 
     return {
       success: true,
       ...details,
-      ticket_id: validation.ticket_id,
+      ticket_id: ticketId,
+      scanned_at: scannedAt,
     };
-  }, [loadTicketDetails]);
+  }, [loadTicketDetails, markTicketUsedBestEffort]);
+
+  const completeSuccessfulScan = useCallback((scanResult: ScanResult) => {
+    const recentScan = toRecentScan(scanResult);
+    if (recentScan) writeRecentScan(recentScan);
+    navigate("/scanner", { replace: true, state: { lastScan: recentScan } });
+  }, [navigate]);
 
   const processQR = useCallback(async (rawValue: string) => {
     const qrValue = rawValue.trim();
-
     setPhase("processing");
+    setFailure(null);
 
     if (!qrValue.startsWith("BUSPAY:")) {
-      setResult({ success: false, reason: "Not a valid BusPay ticket QR code" });
-      setPhase("result");
+      setFailure("Not a valid BusPay ticket QR code");
+      setPhase("failed");
       return;
     }
 
@@ -233,15 +299,19 @@ export default function ScannerHome() {
       const scanResult = await scanWithValidation(qrValue);
       if (!mountedRef.current) return;
 
-      setResult(scanResult);
-      if (scanResult.success) setScanCount((count) => count + 1);
+      if (!scanResult.success) {
+        setFailure(scanResult.reason ?? "Could not verify this ticket.");
+        setPhase("failed");
+        return;
+      }
+
+      completeSuccessfulScan(scanResult);
     } catch (err) {
       if (!mountedRef.current) return;
-      setResult({ success: false, reason: errorMessage(err) });
+      setFailure(errorMessage(err));
+      setPhase("failed");
     }
-
-    if (mountedRef.current) setPhase("result");
-  }, [scanWithValidation]);
+  }, [completeSuccessfulScan, scanWithValidation]);
 
   const startScanner = useCallback(async () => {
     if (startingRef.current || scannerRef.current?.isScanning) return;
@@ -302,9 +372,9 @@ export default function ScannerHome() {
     };
   }, [startScanner, stopScanner]);
 
-  const handleReset = async () => {
+  const handleRetry = async () => {
     processedRef.current = false;
-    setResult(null);
+    setFailure(null);
     setPhase("scanning");
     await startScanner();
   };
@@ -314,177 +384,118 @@ export default function ScannerHome() {
     navigate("/scanner");
   };
 
-  const routeText = result?.origin && result?.destination ? `${result.origin} -> ${result.destination}` : "-";
-  const travelDateText = result?.travel_date ? format(new Date(result.travel_date), "EEE, MMM d") : "-";
-  const seatText = typeof result?.seat === "number" ? `Seat #${result.seat}` : "-";
-
   return (
-    <div className="relative flex min-h-screen flex-col overflow-hidden bg-[#0f0f1a]">
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-white">
       <div
         className="absolute left-0 right-0 top-0 z-20 flex items-center justify-between px-5 pb-4 pt-12"
-        style={{ background: "linear-gradient(to bottom, rgba(15,15,26,1) 0%, rgba(15,15,26,0) 100%)" }}
+        style={{ background: "linear-gradient(to bottom, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0) 100%)" }}
       >
-        <button onClick={handleBack} className="flex items-center gap-2 text-sm font-semibold text-slate-300 hover:text-white">
+        <button onClick={handleBack} className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-slate-700 shadow-sm ring-1 ring-slate-200">
           <ArrowLeft className="h-5 w-5" />
         </button>
-        <p className="text-sm font-bold text-white">Scan Ticket</p>
-        {scanCount > 0 ? (
-          <div className="flex items-center gap-1.5 rounded-full border border-green-500/30 bg-green-500/20 px-3 py-1">
-            <CheckCircle2 className="h-3.5 w-3.5 text-green-400" />
-            <span className="text-xs font-bold text-green-400">{scanCount}</span>
-          </div>
-        ) : (
-          <div className="w-16" />
-        )}
+        <p className="rounded-full bg-white/90 px-4 py-2 text-sm font-bold text-slate-900 shadow-sm ring-1 ring-slate-200">Scan Ticket</p>
+        <div className="w-10" />
       </div>
 
-      <div id={QR_DIV} className="absolute inset-0 z-0 bg-black" />
+      <div id={QR_DIV} className="absolute inset-0 z-0 bg-slate-100" />
 
       {phase === "scanning" && !camError && (
         <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center">
           <div
             className="absolute inset-0"
-            style={{ background: "radial-gradient(ellipse 55vw 55vw at center, transparent 0%, rgba(0,0,0,0.65) 100%)" }}
+            style={{ background: "radial-gradient(circle 36vw at center, transparent 0%, transparent 38%, rgba(255,255,255,0.78) 72%, rgba(255,255,255,0.92) 100%)" }}
           />
           <div className="relative z-10" style={{ width: "62vw", height: "62vw", maxWidth: 280, maxHeight: 280 }}>
             {[
-              "left-0 top-0 rounded-tl-2xl border-l-[3px] border-t-[3px]",
-              "right-0 top-0 rounded-tr-2xl border-r-[3px] border-t-[3px]",
-              "bottom-0 left-0 rounded-bl-2xl border-b-[3px] border-l-[3px]",
-              "bottom-0 right-0 rounded-br-2xl border-b-[3px] border-r-[3px]",
+              "left-0 top-0 rounded-tl-2xl border-l-[4px] border-t-[4px]",
+              "right-0 top-0 rounded-tr-2xl border-r-[4px] border-t-[4px]",
+              "bottom-0 left-0 rounded-bl-2xl border-b-[4px] border-l-[4px]",
+              "bottom-0 right-0 rounded-br-2xl border-b-[4px] border-r-[4px]",
             ].map((cls) => (
-              <div key={cls} className={`absolute h-8 w-8 border-orange-400 ${cls}`} />
+              <div key={cls} className={`absolute h-10 w-10 border-orange-500 ${cls}`} />
             ))}
             <div
-              className="absolute left-1 right-1 h-[2px] rounded-full"
+              className="absolute left-2 right-2 h-[3px] rounded-full"
               style={{
                 background: "linear-gradient(90deg, transparent, #f97316, transparent)",
-                boxShadow: "0 0 8px rgba(249,115,22,0.8)",
+                boxShadow: "0 0 12px rgba(249,115,22,0.75)",
                 animation: "scanline 2s ease-in-out infinite",
               }}
             />
           </div>
-          <p className="relative z-10 mt-7 text-sm font-medium text-white/80">Point camera at passenger QR code</p>
+          <p className="relative z-10 mt-7 rounded-full bg-white/95 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">
+            Point camera at passenger QR code
+          </p>
         </div>
       )}
 
       {camError && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center px-8">
-          <div className="w-full max-w-xs rounded-3xl border border-red-500/30 bg-[#1a1a2e] p-6 text-center">
-            <XCircle className="mx-auto mb-3 h-12 w-12 text-red-400" />
-            <p className="mb-5 text-sm leading-relaxed text-slate-300">{camError}</p>
-            <button onClick={() => void handleReset()} className="w-full rounded-2xl bg-orange-500 py-3 text-sm font-bold text-white">
-              Retry
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-white px-8">
+          <div className="w-full max-w-xs rounded-3xl border border-red-200 bg-white p-6 text-center shadow-xl">
+            <XCircle className="mx-auto mb-3 h-12 w-12 text-red-500" />
+            <p className="mb-5 text-sm leading-relaxed text-slate-600">{camError}</p>
+            <button onClick={() => void handleRetry()} className="w-full rounded-2xl bg-orange-500 py-3 text-sm font-bold text-white shadow-sm">
+              Retry Camera
             </button>
           </div>
         </div>
       )}
 
       {phase === "processing" && (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="mb-4 h-16 w-16 animate-spin rounded-full border-4 border-orange-500 border-t-transparent" />
-          <p className="text-sm font-semibold text-slate-300">Verifying ticket...</p>
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-50">
+            <CheckCircle2 className="h-8 w-8 animate-pulse text-green-600" />
+          </div>
+          <p className="text-sm font-semibold text-slate-700">Verifying ticket...</p>
         </div>
       )}
 
-      {phase === "result" && result && (
-        <div className="absolute inset-0 z-20 flex items-end bg-black/60 backdrop-blur-[2px]">
-          <div
-            className={cn(
-              "w-full rounded-t-[2rem] border-t p-6 pb-10",
-              result.success ? "border-green-500/30 bg-[#0d1f12]" : "border-red-500/30 bg-[#1f0d0d]",
-            )}
-          >
-            <div className="mx-auto mb-5 h-1 w-12 rounded-full bg-white/15" />
-            {result.success ? (
-              <>
-                <div className="mb-5 flex items-center gap-4">
-                  <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-green-500/20">
-                    <CheckCircle2 className="h-8 w-8 text-green-400" />
-                  </div>
-                  <div>
-                    <p className="text-xl font-extrabold text-green-400">Boarding Confirmed!</p>
-                    <p className="mt-0.5 text-xs text-slate-400">Ticket verified successfully</p>
-                  </div>
-                </div>
-                <div className="mb-5 space-y-3 rounded-2xl border border-white/5 bg-white/5 p-4">
-                  <InfoRow icon={<User className="h-3.5 w-3.5" />} label="Passenger" value={result.passenger ?? "-"} />
-                  <InfoRow icon={<Armchair className="h-3.5 w-3.5" />} label="Seat" value={seatText} />
-                  <InfoRow icon={<MapPin className="h-3.5 w-3.5" />} label="Route" value={routeText} />
-                  <InfoRow icon={<Calendar className="h-3.5 w-3.5" />} label="Date" value={travelDateText} />
-                  <InfoRow icon={<Clock className="h-3.5 w-3.5" />} label="Departure" value={result.departure?.slice(0, 5) ?? "-"} />
-                </div>
-                <button
-                  onClick={() => void handleReset()}
-                  className="w-full rounded-2xl bg-green-500 py-4 text-sm font-bold text-white transition-all hover:bg-green-600 active:scale-[0.98]"
-                >
-                  Scan Next Passenger
-                </button>
-              </>
-            ) : (
-              <>
-                <div className="mb-5 flex items-center gap-4">
-                  <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-red-500/20">
-                    <XCircle className="h-8 w-8 text-red-400" />
-                  </div>
-                  <div>
-                    <p className="text-xl font-extrabold text-red-400">Scan Failed</p>
-                    <p className="mt-0.5 text-xs text-slate-400">Could not verify this ticket</p>
-                  </div>
-                </div>
-                <div className="mb-5 rounded-2xl border border-red-500/20 bg-red-500/10 p-4">
-                  <p className="text-center text-sm text-red-300">{result.reason}</p>
-                </div>
-                <button
-                  onClick={() => void handleReset()}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-orange-500 py-4 text-sm font-bold text-white transition-all hover:bg-orange-600 active:scale-[0.98]"
-                >
-                  <RotateCcw className="h-4 w-4" /> Try Again
-                </button>
-              </>
-            )}
+      {phase === "failed" && (
+        <div className="absolute inset-0 z-20 flex items-end bg-slate-950/30 backdrop-blur-[2px]">
+          <div className="w-full rounded-t-[2rem] border-t border-red-100 bg-white p-6 pb-10 shadow-2xl">
+            <div className="mx-auto mb-5 h-1 w-12 rounded-full bg-slate-200" />
+            <div className="mb-5 flex items-center gap-4">
+              <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-red-50">
+                <XCircle className="h-8 w-8 text-red-500" />
+              </div>
+              <div>
+                <p className="text-xl font-extrabold text-slate-900">Scan Failed</p>
+                <p className="mt-0.5 text-xs text-slate-500">Could not verify this ticket</p>
+              </div>
+            </div>
+            <div className="mb-5 rounded-2xl border border-red-100 bg-red-50 p-4">
+              <p className="text-center text-sm text-red-700">{failure}</p>
+            </div>
+            <button
+              onClick={() => void handleRetry()}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-orange-500 py-4 text-sm font-bold text-white transition-all hover:bg-orange-600 active:scale-[0.98]"
+            >
+              <RotateCcw className="h-4 w-4" /> Try Again
+            </button>
           </div>
         </div>
       )}
 
-      <div className="pointer-events-none absolute bottom-8 left-0 right-0 z-10 flex justify-center">
+      <div className="pointer-events-none absolute bottom-8 left-0 right-0 z-10 flex justify-center px-5">
         <div
           className={cn(
-            "flex items-center gap-2 rounded-full border px-5 py-2 text-xs font-semibold backdrop-blur-md",
+            "flex items-center gap-2 rounded-full border px-5 py-2 text-xs font-semibold shadow-sm backdrop-blur-md",
             camError
-              ? "border-red-500/30 bg-red-500/20 text-red-300"
+              ? "border-red-200 bg-white/95 text-red-600"
               : phase === "processing"
-                ? "border-orange-500/30 bg-orange-500/20 text-orange-300"
-                : phase === "result" && result?.success
-                  ? "border-green-500/30 bg-green-500/20 text-green-300"
-                  : phase === "result"
-                    ? "border-red-500/30 bg-red-500/20 text-red-300"
-                    : "border-white/10 bg-black/40 text-slate-300",
+                ? "border-orange-200 bg-white/95 text-orange-600"
+                : phase === "failed"
+                  ? "border-red-200 bg-white/95 text-red-600"
+                  : "border-slate-200 bg-white/95 text-slate-700",
           )}
         >
           <span
             className={cn(
               "h-2 w-2 rounded-full",
-              camError
-                ? "bg-red-400"
-                : phase === "processing"
-                  ? "animate-pulse bg-orange-400"
-                  : phase === "result" && result?.success
-                    ? "bg-green-400"
-                    : phase === "result"
-                      ? "bg-red-400"
-                      : "animate-pulse bg-orange-400",
+              camError || phase === "failed" ? "bg-red-500" : phase === "processing" ? "animate-pulse bg-orange-500" : "animate-pulse bg-green-500",
             )}
           />
-          {camError
-            ? "Camera Error"
-            : phase === "scanning"
-              ? "Ready to Scan"
-              : phase === "processing"
-                ? "Verifying..."
-                : result?.success
-                  ? "Boarding Confirmed"
-                  : "Scan Failed"}
+          {camError ? "Camera Error" : phase === "scanning" ? "Ready to Scan" : phase === "processing" ? "Verifying..." : "Scan Failed"}
         </div>
       </div>
 
@@ -503,23 +514,11 @@ export default function ScannerHome() {
         @keyframes scanline {
           0%   { top: 6%;  opacity: 1; }
           48%  { opacity: 1; }
-          50%  { top: 88%; opacity: 0.5; }
+          50%  { top: 88%; opacity: 0.55; }
           52%  { opacity: 1; }
           100% { top: 6%;  opacity: 1; }
         }
       `}</style>
-    </div>
-  );
-}
-
-function InfoRow({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <div className="flex flex-shrink-0 items-center gap-2 text-slate-400">
-        <span className="text-orange-400">{icon}</span>
-        <span className="text-xs">{label}</span>
-      </div>
-      <span className="truncate text-right text-sm font-semibold text-white">{value}</span>
     </div>
   );
 }

@@ -5,7 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 
     <!-- PWA Manifest -->
-    <link rel="manifest" href="/manifest.json" />
+    <link id="app-manifest" rel="manifest" href="/manifest.json" />
+    <script>
+      if (location.pathname.startsWith('/scanner')) {
+        document.getElementById('app-manifest')?.setAttribute('href', '/scanner-manifest.json');
+      }
+    </script>
 
     <!-- Icons -->
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
