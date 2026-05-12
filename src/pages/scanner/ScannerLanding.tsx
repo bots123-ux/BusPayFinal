@@ -12,7 +12,21 @@ interface RecentScan {
   origin: string;
   destination: string;
   seat: number;
-  boarded_at: string;
+  scanned_at: string;
+}
+
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+};
+
+interface RecentScanRow {
+  id: string;
+  seat_number: number;
+  updated_at: string;
+  trips?: {
+    routes?: { origin?: string | null; destination?: string | null } | null;
+  } | null;
 }
 
 export default function ScannerLanding() {
@@ -21,7 +35,7 @@ export default function ScannerLanding() {
   const [driverName, setDriverName] = useState("Driver");
   const [todayCount, setTodayCount] = useState(0);
   const [recentScans, setRecentScans] = useState<RecentScan[]>([]);
-  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(false);
   const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
   const [showIosHint, setShowIosHint] = useState(false);
@@ -36,7 +50,10 @@ export default function ScannerLanding() {
     if (meta) meta.content = "#0f0f1a";
 
     if (window.matchMedia("(display-mode: standalone)").matches) setInstalled(true);
-    const handler = (e: any) => { e.preventDefault(); setInstallPrompt(e); };
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e as BeforeInstallPromptEvent);
+    };
     window.addEventListener("beforeinstallprompt", handler);
     window.addEventListener("appinstalled", () => setInstalled(true));
 
@@ -53,23 +70,23 @@ export default function ScannerLanding() {
     supabase.from("passenger").select("full_name").eq("user_id", user.id).maybeSingle()
       .then(({ data }) => { if (data?.full_name) setDriverName(data.full_name); });
 
-    // Load today's boarded tickets count
+    // Load today's used tickets count. A successful scan marks a paid ticket as "used".
     const today = new Date().toISOString().split("T")[0];
     supabase.from("ticket")
-      .select("id, seat_number, boarded_at, trips(routes(origin, destination))")
-      .eq("status", "boarded")
-      .gte("boarded_at", `${today}T00:00:00`)
-      .order("boarded_at", { ascending: false })
+      .select("id, seat_number, updated_at, trips(routes(origin, destination))")
+      .eq("status", "used")
+      .gte("updated_at", `${today}T00:00:00`)
+      .order("updated_at", { ascending: false })
       .limit(10)
       .then(({ data }) => {
         setTodayCount(data?.length ?? 0);
-        setRecentScans((data ?? []).map((t: any) => ({
+        setRecentScans(((data as RecentScanRow[] | null) ?? []).map((t) => ({
           ticket_id: t.id,
           passenger: "Passenger",
           origin: t.trips?.routes?.origin ?? "—",
           destination: t.trips?.routes?.destination ?? "—",
           seat: t.seat_number,
-          boarded_at: t.boarded_at,
+          scanned_at: t.updated_at,
         })));
       });
   }, [user]);
@@ -181,7 +198,7 @@ export default function ScannerLanding() {
                 </div>
                 <div className="flex items-center gap-1 text-xs text-slate-500 flex-shrink-0">
                   <Clock className="h-3 w-3" />
-                  {format(new Date(s.boarded_at), "h:mm a")}
+                  {format(new Date(s.scanned_at), "h:mm a")}
                 </div>
               </div>
             ))}
