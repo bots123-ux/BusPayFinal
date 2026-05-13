@@ -189,8 +189,7 @@ export default function Profile() {
           {/* Download App */}
           <DownloadAppSection />
 
-          {/* Download QR Reader (for drivers) */}
-          <QRReaderSection />
+
 
           <Button variant="outline" size="lg" className="mt-2 w-full text-destructive hover:bg-destructive/5" onClick={handleLogout}>
             <LogOut className="h-4 w-4" /> {t("profile.logout")}
@@ -342,26 +341,3 @@ function DownloadAppSection() {
   );
 }
 
-function QRReaderSection() {
-  return (
-    <div className="rounded-2xl border border-border bg-card p-5">
-      <div className="flex items-center gap-3 mb-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900">
-          <img src="/scanner-icons/icon-96x96.png" alt="QR Reader"
-            className="h-10 w-10 rounded-xl" onError={e => { (e.target as HTMLImageElement).style.display='none'; }} />
-        </div>
-        <div>
-          <div className="font-extrabold text-sm">QR Reader — Driver App</div>
-          <div className="text-xs text-muted-foreground">For bus drivers only</div>
-        </div>
-      </div>
-      <p className="text-xs text-muted-foreground mb-4">
-        The QR Reader app lets bus drivers scan and verify passenger tickets during boarding. Only authorized driver accounts can log in.
-      </p>
-      <a href="/scanner/login" target="_blank" rel="noopener noreferrer"
-        className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-secondary py-3 text-sm font-bold text-foreground hover:bg-secondary/80 transition-colors">
-        <Download className="h-4 w-4" /> Open QR Reader App
-      </a>
-    </div>
-  );
-}
