@@ -44,6 +44,13 @@
       "description": "View your booked tickets",
       "url": "/app/tickets",
       "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "QR Reader",
+      "short_name": "Scanner",
+      "description": "Scan passenger tickets for boarding",
+      "url": "/scanner",
+      "icons": [{ "src": "/scanner-icons/icon-96x96.png", "sizes": "96x96" }]
     }
   ]
 }

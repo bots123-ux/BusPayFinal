@@ -10,15 +10,23 @@ export default function ScannerApp() {
   const [tab, setTab] = useState<Tab>("home");
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#0f0f1a]">
-      {/* Page content */}
-      <div className="flex-1">
+    <div className="flex flex-col bg-[#0f0f1a]"
+      style={{
+        height: "100dvh",           // dynamic viewport — no URL bar cutoff
+        overscrollBehavior: "none", // no bounce/rubber band
+        WebkitOverflowScrolling: "touch",
+      }}>
+
+      {/* Page content — scrollable */}
+      <div className="flex-1 overflow-y-auto"
+        style={{ overscrollBehavior: "none" }}>
         {tab === "home"    && <ScannerLanding />}
         {tab === "profile" && <ScannerProfile />}
       </div>
 
-      {/* Bottom nav */}
-      <nav className="sticky bottom-0 z-50 flex border-t border-white/10 bg-[#0f0f1a]">
+      {/* Bottom nav with safe area padding for iPhone home indicator */}
+      <nav className="flex flex-shrink-0 border-t border-white/10 bg-[#0f0f1a]"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
         {([
           { id: "home",    icon: Home, label: "Home"    },
           { id: "profile", icon: User, label: "Profile" },
@@ -26,9 +34,9 @@ export default function ScannerApp() {
           <button key={id} onClick={() => setTab(id)}
             className={cn(
               "flex flex-1 flex-col items-center gap-1 py-3 text-xs font-semibold transition-colors",
-              tab === id ? "text-orange-400" : "text-slate-500 hover:text-slate-300"
+              tab === id ? "text-orange-400" : "text-slate-500"
             )}>
-            <Icon className={cn("h-5 w-5", tab === id && "text-orange-400")} />
+            <Icon className="h-5 w-5" />
             {label}
           </button>
         ))}

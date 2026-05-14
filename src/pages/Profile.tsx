@@ -188,6 +188,7 @@ export default function Profile() {
 
           {/* Download App */}
           <DownloadAppSection />
+          <OpenScannerSection />
 
 
 
@@ -341,3 +342,42 @@ function DownloadAppSection() {
   );
 }
 
+
+function OpenScannerSection() {
+  const navigate = useNavigate();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    supabase.rpc("is_driver_or_admin").then(({ data }) => setIsAdmin(!!data));
+  }, []);
+
+  if (!isAdmin) return null;
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5">
+      <div className="flex items-center gap-3 mb-3">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900">
+          <img
+            src="/scanner-icons/icon-96x96.png"
+            alt="QR Reader"
+            className="h-10 w-10 rounded-xl"
+            onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+          />
+        </div>
+        <div>
+          <div className="font-extrabold text-sm">QR Reader</div>
+          <div className="text-xs text-muted-foreground">Driver boarding scanner</div>
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground mb-4">
+        Opens the QR ticket scanner inside the app — no browser bar, feels native. Only accessible to authorized drivers and admins.
+      </p>
+      <button
+        onClick={() => navigate("/scanner")}
+        className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground hover:bg-primary/90 active:scale-[0.98] transition-all"
+      >
+        Open QR Reader
+      </button>
+    </div>
+  );
+}

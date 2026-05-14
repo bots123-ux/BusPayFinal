@@ -22,8 +22,7 @@ export default function ScannerLanding() {
 
   useEffect(() => {
     if (!user) return;
-    supabase.from("passenger").select("full_name")
-      .eq("user_id", user.id).maybeSingle()
+    supabase.from("passenger").select("full_name").eq("user_id", user.id).maybeSingle()
       .then(({ data }) => { if (data?.full_name) setDriverName(data.full_name); });
 
     const today = new Date().toISOString().split("T")[0];
@@ -41,16 +40,18 @@ export default function ScannerLanding() {
   }, [user]);
 
   return (
-    <div className="flex flex-col bg-[#0f0f1a] text-white pb-4">
+    <div className="flex flex-col text-white"
+      style={{ paddingTop: "env(safe-area-inset-top)" }}>
+
       {/* Header */}
-      <div className="px-5 pt-14 pb-4">
+      <div className="px-5 pt-10 pb-4">
         <p className="text-xs text-slate-400 font-medium uppercase tracking-widest mb-1">QR Reader</p>
         <h1 className="text-2xl font-extrabold">Good day, {driverName.split(" ")[0]} 👋</h1>
         <p className="text-sm text-slate-400 mt-1">{format(new Date(), "EEEE, MMMM d, yyyy")}</p>
       </div>
 
       {/* Today's boarding card */}
-      <div className="mx-5 mb-4 overflow-hidden rounded-3xl bg-gradient-to-br from-orange-500 to-orange-600 p-5 shadow-lg shadow-orange-500/30">
+      <div className="mx-5 mb-4 overflow-hidden rounded-3xl bg-gradient-to-br from-orange-500 to-orange-600 p-5 shadow-lg shadow-orange-500/25">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-orange-100 mb-1">Today's Boarding</p>
@@ -68,14 +69,14 @@ export default function ScannerLanding() {
       {/* Start Scanning button */}
       <div className="mx-5 mb-5">
         <button onClick={() => navigate("/scanner/scan")}
-          className="flex w-full items-center justify-center gap-3 rounded-3xl bg-white py-5 text-[#0f0f1a] font-extrabold text-lg shadow-lg shadow-white/10 hover:bg-slate-100 active:scale-[0.98] transition-all">
+          className="flex w-full items-center justify-center gap-3 rounded-3xl bg-white py-5 text-[#0f0f1a] font-extrabold text-lg shadow-xl shadow-white/10 active:scale-[0.98] transition-all">
           <ScanLine className="h-6 w-6" />
           Start Scanning
         </button>
       </div>
 
       {/* Recent scans */}
-      <div className="mx-5">
+      <div className="mx-5 pb-6">
         <div className="mb-3 flex items-center justify-between">
           <p className="text-sm font-bold text-slate-200">Recent Scans</p>
           {recentScans.length > 0 && (
@@ -85,10 +86,10 @@ export default function ScannerLanding() {
 
         {loading ? (
           <div className="space-y-2">
-            {[1,2].map(i => <div key={i} className="h-16 rounded-2xl bg-white/5 animate-pulse" />)}
+            {[1,2,3].map(i => <div key={i} className="h-16 rounded-2xl bg-white/5 animate-pulse" />)}
           </div>
         ) : recentScans.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-3xl border border-white/5 bg-white/3 py-12 text-center">
+          <div className="flex flex-col items-center justify-center rounded-3xl border border-white/5 bg-white/3 py-14 text-center">
             <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5">
               <ScanLine className="h-7 w-7 text-slate-500" />
             </div>
