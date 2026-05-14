@@ -1,14 +1,9 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Download, Loader2, Lock, Mail, Smartphone } from "lucide-react";
+import { Loader2, Lock, Mail, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
-
-type BeforeInstallPromptEvent = Event & {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
-};
 
 export default function ScannerLogin() {
   const navigate = useNavigate();
@@ -16,57 +11,43 @@ export default function ScannerLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [installed, setInstalled] = useState(false);
-  const [showInstallHelp, setShowInstallHelp] = useState(false);
-  const isIos = useMemo(() => /iphone|ipad|ipod/i.test(navigator.userAgent), []);
-  const isAndroid = useMemo(() => /android/i.test(navigator.userAgent), []);
 
+  // Swap manifest for installability
   useEffect(() => {
     const link = document.querySelector<HTMLLinkElement>("link[rel='manifest']");
     const prev = link?.href ?? "";
     if (link) link.href = "/scanner-manifest.json";
-
     const meta = document.querySelector<HTMLMetaElement>("meta[name='theme-color']");
     const prevTheme = meta?.content ?? "";
-    if (meta) meta.content = "#ffffff";
+    if (meta) meta.content = "#0a0f28";
 
-    const handler = (event: Event) => {
-      event.preventDefault();
-      setInstallPrompt(event as BeforeInstallPromptEvent);
-    };
-    const installedHandler = () => setInstalled(true);
-
+    const handler = (e: any) => { e.preventDefault(); setInstallPrompt(e); };
     window.addEventListener("beforeinstallprompt", handler);
-    window.addEventListener("appinstalled", installedHandler);
+    window.addEventListener("appinstalled", () => setInstalled(true));
     if (window.matchMedia("(display-mode: standalone)").matches) setInstalled(true);
 
     return () => {
       if (link) link.href = prev;
       if (meta) meta.content = prevTheme;
       window.removeEventListener("beforeinstallprompt", handler);
-      window.removeEventListener("appinstalled", installedHandler);
     };
   }, []);
 
+  // Redirect if already logged in as driver/admin
   useEffect(() => {
     if (!user) return;
     supabase.rpc("is_driver_or_admin").then(({ data }) => {
       if (data) navigate("/scanner", { replace: true });
     });
-  }, [navigate, user]);
+  }, [user]);
 
-  const handleLogin = async (event: FormEvent) => {
-    event.preventDefault();
+  const handleLogin = async (e: FormEvent) => {
+    e.preventDefault();
     setLoading(true);
-
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      toast.error("Invalid email or password");
-      setLoading(false);
-      return;
-    }
-
+    if (error) { toast.error("Invalid email or password"); setLoading(false); return; }
     const { data: allowed } = await supabase.rpc("is_driver_or_admin");
     if (!allowed) {
       await supabase.auth.signOut();
@@ -74,110 +55,70 @@ export default function ScannerLogin() {
       setLoading(false);
       return;
     }
-
     navigate("/scanner", { replace: true });
   };
 
   const handleInstall = async () => {
     if (installPrompt) {
-      await installPrompt.prompt();
+      installPrompt.prompt();
       const { outcome } = await installPrompt.userChoice;
       if (outcome === "accepted") setInstalled(true);
       setInstallPrompt(null);
-      return;
     }
-
-    setShowInstallHelp(true);
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-slate-50 px-6 text-slate-950">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-[#0a0f28] px-6">
+      {/* Icon + title */}
       <div className="mb-8 flex flex-col items-center gap-4">
-        <div className="flex h-24 w-24 items-center justify-center rounded-3xl border border-orange-100 bg-white shadow-sm">
+        <div className="flex h-24 w-24 items-center justify-center rounded-3xl border-2 border-orange-500/30 bg-slate-900 shadow-lg shadow-orange-500/10">
           <img src="/scanner-icons/icon-192x192.png" alt="QR Reader" className="h-20 w-20 rounded-2xl" />
         </div>
         <div className="text-center">
-          <h1 className="text-2xl font-extrabold">QR Reader</h1>
-          <p className="mt-1 text-sm text-slate-500">BusPay Driver App - Boarding Verification</p>
+          <h1 className="text-2xl font-extrabold text-white">QR Reader</h1>
+          <p className="text-sm text-slate-400 mt-1">BusPay Driver App · Boarding Verification</p>
         </div>
       </div>
 
-      {!installed && (
-        <button
-          onClick={handleInstall}
-          className="mb-6 flex items-center gap-2 rounded-2xl border border-orange-200 bg-white px-5 py-3 text-sm font-bold text-orange-600 shadow-sm transition-colors hover:bg-orange-50"
-        >
-          <Download className="h-4 w-4" />
-          {installPrompt ? "Install QR Reader App" : "How to Install QR Reader"}
+      {/* Install button */}
+      {!installed && installPrompt && (
+        <button onClick={handleInstall}
+          className="mb-6 flex items-center gap-2 rounded-2xl bg-orange-500/15 border border-orange-500/30 px-5 py-3 text-sm font-semibold text-orange-400 hover:bg-orange-500/25 transition-colors">
+          <Download className="h-4 w-4" /> Install QR Reader App
         </button>
       )}
 
+      {/* Login form */}
       <form onSubmit={handleLogin} className="w-full max-w-sm space-y-4">
         <div className="relative">
-          <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="Driver email"
-            required
-            autoComplete="email"
-            className="w-full rounded-2xl border border-slate-200 bg-white py-4 pl-11 pr-4 text-slate-950 shadow-sm placeholder:text-slate-400 focus:border-orange-500 focus:outline-none"
-          />
+          <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+            placeholder="Driver email" required autoComplete="email"
+            className="w-full rounded-2xl border border-white/10 bg-slate-900 py-4 pl-11 pr-4 text-white placeholder:text-slate-500 focus:border-orange-500 focus:outline-none" />
         </div>
         <div className="relative">
-          <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            placeholder="Password"
-            required
-            autoComplete="current-password"
-            className="w-full rounded-2xl border border-slate-200 bg-white py-4 pl-11 pr-4 text-slate-950 shadow-sm placeholder:text-slate-400 focus:border-orange-500 focus:outline-none"
-          />
+          <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+            placeholder="Password" required autoComplete="current-password"
+            className="w-full rounded-2xl border border-white/10 bg-slate-900 py-4 pl-11 pr-4 text-white placeholder:text-slate-500 focus:border-orange-500 focus:outline-none" />
         </div>
-        <button
-          type="submit"
-          disabled={loading}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-orange-500 py-4 font-bold text-white shadow-lg shadow-orange-500/20 transition-colors hover:bg-orange-600 disabled:opacity-50"
-        >
+        <button type="submit" disabled={loading}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-orange-500 py-4 font-bold text-white hover:bg-orange-600 disabled:opacity-50 transition-colors">
           {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Sign In to Scanner"}
         </button>
       </form>
 
-      <p className="mt-6 text-center text-xs text-slate-500">Only authorized driver accounts can access this app.</p>
-
-      {showInstallHelp && (
-        <div className="fixed inset-0 z-50 flex items-end bg-slate-950/40 backdrop-blur-sm" onClick={() => setShowInstallHelp(false)}>
-          <div className="w-full rounded-t-3xl border-t border-slate-200 bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
-            <div className="mx-auto mb-4 h-1 w-12 rounded-full bg-slate-200" />
-            <div className="mb-5 flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-orange-50">
-                <Smartphone className="h-5 w-5 text-orange-600" />
-              </div>
-              <div>
-                <p className="text-lg font-extrabold">Install QR Reader</p>
-                <p className="text-sm text-slate-500">Use your browser install option if a prompt does not appear.</p>
-              </div>
-            </div>
-            {(isIos
-              ? ["Open this page in Safari.", "Tap Share at the bottom.", "Tap Add to Home Screen.", "Tap Add."]
-              : isAndroid
-                ? ["Open this page in Chrome.", "Tap the three-dot menu.", "Tap Install app or Add to Home screen.", "Confirm Install."]
-                : ["Open this page in Chrome or Edge.", "Click the install icon in the address bar, or open the browser menu.", "Choose Install QR Reader or Install app.", "Confirm Install."]
-            ).map((text, index) => (
-              <div key={text} className="mb-3 flex items-center gap-3">
-                <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-orange-500 text-xs font-bold text-white">{index + 1}</div>
-                <p className="text-sm font-medium text-slate-700">{text}</p>
-              </div>
-            ))}
-            <button onClick={() => setShowInstallHelp(false)} className="mt-4 w-full rounded-2xl bg-orange-500 py-3.5 font-bold text-white">
-              Got it
-            </button>
-          </div>
+      {/* iOS install hint */}
+      {!installed && !installPrompt && (
+        <div className="mt-8 text-center rounded-2xl border border-white/10 bg-white/5 px-5 py-4 w-full max-w-sm">
+          <p className="text-xs font-semibold text-slate-400 mb-1">Install on iPhone</p>
+          <p className="text-xs text-slate-500">Open in Safari → Share (□↑) → Add to Home Screen</p>
         </div>
       )}
+
+      <p className="mt-6 text-center text-xs text-slate-600">
+        Only authorized driver accounts can access this app.
+      </p>
     </div>
   );
 }
