@@ -344,35 +344,16 @@ function DownloadAppSection() {
 
 
 function OpenScannerSection() {
+  const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
-  const [installState, setInstallState] = useState<"idle" | "installed">("idle");
   const [showModal, setShowModal] = useState(false);
   const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
 
   useEffect(() => {
     supabase.rpc("is_driver_or_admin").then(({ data }) => setIsAdmin(!!data));
-    // Only mark installed if user explicitly installed via prompt in this session
-    // Do NOT use standalone check — that just means BusPay is installed, not QR Reader
   }, []);
 
   if (!isAdmin) return null;
-
-  const handleInstall = async () => {
-    // Try the stored global prompt
-    const w = window as any;
-    const prompt = w.__buspay_install_prompt;
-    if (prompt) {
-      prompt.prompt();
-      const { outcome } = await prompt.userChoice;
-      if (outcome === "accepted") {
-        setInstallState("installed");
-        w.__buspay_install_prompt = null;
-      }
-      return;
-    }
-    // No auto-prompt available — show manual instructions
-    setShowModal(true);
-  };
 
   return (
     <>
@@ -391,45 +372,48 @@ function OpenScannerSection() {
             <div className="text-xs text-muted-foreground">Driver boarding scanner</div>
           </div>
         </div>
-        <p className="text-xs text-muted-foreground mb-4">
-          Install the QR ticket scanner on your phone — scan passenger tickets directly during boarding. Only visible to authorized accounts.
-        </p>
-        {installState === "installed" ? (
-          <div className="flex items-center justify-center gap-2 rounded-xl border border-green-500/30 bg-green-500/10 py-3 text-sm font-bold text-green-600">
-            ✅ QR Reader is installed
-          </div>
-        ) : (
-          <button
-            onClick={handleInstall}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground hover:bg-primary/90 active:scale-[0.98] transition-all"
-          >
-            <Download className="h-4 w-4" />
-            Install QR Reader App
-          </button>
-        )}
+
+        {/* Open scanner directly — works inside BusPay PWA without URL bar */}
+        <button
+          onClick={() => navigate("/scanner")}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground hover:bg-primary/90 active:scale-[0.98] transition-all mb-2"
+        >
+          Open QR Reader
+        </button>
+
+        {/* Add to home screen as separate icon */}
+        <button
+          onClick={() => setShowModal(true)}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-secondary py-3 text-sm font-semibold text-foreground hover:bg-secondary/80 active:scale-[0.98] transition-all"
+        >
+          <Download className="h-4 w-4" />
+          Add QR Reader to Home Screen
+        </button>
       </div>
 
-      {/* Manual install instructions modal */}
+      {/* Shortcut pinning instructions */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-end bg-black/60 backdrop-blur-sm"
           onClick={() => setShowModal(false)}>
           <div className="w-full rounded-t-3xl border border-border bg-card p-6"
             onClick={e => e.stopPropagation()}>
             <div className="mx-auto mb-4 h-1 w-12 rounded-full bg-border" />
-            <h3 className="text-xl font-extrabold mb-1">Install QR Reader</h3>
+            <h3 className="text-xl font-extrabold mb-1">Add QR Reader to Home Screen</h3>
             <p className="text-sm text-muted-foreground mb-5">
-              {isIos ? "Follow these steps in Safari:" : "Follow these steps in Chrome:"}
+              {isIos
+                ? "Get a separate QR Reader icon on iPhone:"
+                : "Get a separate QR Reader icon on Android:"}
             </p>
             {(isIos ? [
-              "Open this BusPay app in Safari",
+              "Go to buspay-team-ace2.vercel.app/scanner in Safari",
               "Tap the Share button (□↑) at the bottom",
-              "Scroll and tap Add to Home Screen",
-              "Tap Add — QR Reader icon appears on your home screen!",
+              "Tap Add to Home Screen",
+              "Tap Add — QR Reader icon appears on your home screen",
             ] : [
-              "Tap the three-dot menu (⋮) in Chrome top-right",
-              "Tap Add to Home screen or Install app",
-              "Tap Install to confirm",
-              "QR Reader icon appears on your home screen!",
+              "Long-press the BusPay icon on your home screen",
+              "You will see a QR Reader shortcut appear above the icon",
+              "Long-press QR Reader and drag it to your home screen",
+              "QR Reader icon is now on your home screen — no URL bar!",
             ]).map((text, i) => (
               <div key={i} className="flex items-start gap-3 mb-4">
                 <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
