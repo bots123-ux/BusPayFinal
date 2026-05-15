@@ -345,15 +345,14 @@ function DownloadAppSection() {
 
 function OpenScannerSection() {
   const [isAdmin, setIsAdmin] = useState(false);
-  const [installState, setInstallState] = useState<"idle" | "installed" | "no-prompt">("idle");
+  const [installState, setInstallState] = useState<"idle" | "installed">("idle");
   const [showModal, setShowModal] = useState(false);
   const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  const isStandalone = window.matchMedia("(display-mode: standalone)").matches;
 
   useEffect(() => {
     supabase.rpc("is_driver_or_admin").then(({ data }) => setIsAdmin(!!data));
-    // Check install state
-    if (isStandalone) setInstallState("installed");
+    // Only mark installed if user explicitly installed via prompt in this session
+    // Do NOT use standalone check — that just means BusPay is installed, not QR Reader
   }, []);
 
   if (!isAdmin) return null;
