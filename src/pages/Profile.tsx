@@ -344,40 +344,108 @@ function DownloadAppSection() {
 
 
 function OpenScannerSection() {
-  const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [installState, setInstallState] = useState<"idle" | "installed" | "no-prompt">("idle");
+  const [showModal, setShowModal] = useState(false);
+  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isStandalone = window.matchMedia("(display-mode: standalone)").matches;
 
   useEffect(() => {
     supabase.rpc("is_driver_or_admin").then(({ data }) => setIsAdmin(!!data));
+    // Check install state
+    if (isStandalone) setInstallState("installed");
   }, []);
 
   if (!isAdmin) return null;
 
+  const handleInstall = async () => {
+    // Try the stored global prompt
+    const w = window as any;
+    const prompt = w.__buspay_install_prompt;
+    if (prompt) {
+      prompt.prompt();
+      const { outcome } = await prompt.userChoice;
+      if (outcome === "accepted") {
+        setInstallState("installed");
+        w.__buspay_install_prompt = null;
+      }
+      return;
+    }
+    // No auto-prompt available — show manual instructions
+    setShowModal(true);
+  };
+
   return (
-    <div className="rounded-2xl border border-border bg-card p-5">
-      <div className="flex items-center gap-3 mb-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900">
-          <img
-            src="/scanner-icons/icon-96x96.png"
-            alt="QR Reader"
-            className="h-10 w-10 rounded-xl"
-            onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
-          />
+    <>
+      <div className="rounded-2xl border border-border bg-card p-5">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900">
+            <img
+              src="/scanner-icons/icon-96x96.png"
+              alt="QR Reader"
+              className="h-10 w-10 rounded-xl"
+              onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+            />
+          </div>
+          <div>
+            <div className="font-extrabold text-sm">QR Reader</div>
+            <div className="text-xs text-muted-foreground">Driver boarding scanner</div>
+          </div>
         </div>
-        <div>
-          <div className="font-extrabold text-sm">QR Reader</div>
-          <div className="text-xs text-muted-foreground">Driver boarding scanner</div>
-        </div>
+        <p className="text-xs text-muted-foreground mb-4">
+          Install the QR ticket scanner on your phone — scan passenger tickets directly during boarding. Only visible to authorized accounts.
+        </p>
+        {installState === "installed" ? (
+          <div className="flex items-center justify-center gap-2 rounded-xl border border-green-500/30 bg-green-500/10 py-3 text-sm font-bold text-green-600">
+            ✅ QR Reader is installed
+          </div>
+        ) : (
+          <button
+            onClick={handleInstall}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground hover:bg-primary/90 active:scale-[0.98] transition-all"
+          >
+            <Download className="h-4 w-4" />
+            Install QR Reader App
+          </button>
+        )}
       </div>
-      <p className="text-xs text-muted-foreground mb-4">
-        Opens the QR ticket scanner inside the app — no browser bar, feels native. Only accessible to authorized drivers and admins.
-      </p>
-      <button
-        onClick={() => navigate("/scanner")}
-        className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground hover:bg-primary/90 active:scale-[0.98] transition-all"
-      >
-        Open QR Reader
-      </button>
-    </div>
+
+      {/* Manual install instructions modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-end bg-black/60 backdrop-blur-sm"
+          onClick={() => setShowModal(false)}>
+          <div className="w-full rounded-t-3xl border border-border bg-card p-6"
+            onClick={e => e.stopPropagation()}>
+            <div className="mx-auto mb-4 h-1 w-12 rounded-full bg-border" />
+            <h3 className="text-xl font-extrabold mb-1">Install QR Reader</h3>
+            <p className="text-sm text-muted-foreground mb-5">
+              {isIos ? "Follow these steps in Safari:" : "Follow these steps in Chrome:"}
+            </p>
+            {(isIos ? [
+              "Open this BusPay app in Safari",
+              "Tap the Share button (□↑) at the bottom",
+              "Scroll and tap Add to Home Screen",
+              "Tap Add — QR Reader icon appears on your home screen!",
+            ] : [
+              "Tap the three-dot menu (⋮) in Chrome top-right",
+              "Tap Add to Home screen or Install app",
+              "Tap Install to confirm",
+              "QR Reader icon appears on your home screen!",
+            ]).map((text, i) => (
+              <div key={i} className="flex items-start gap-3 mb-4">
+                <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                  {i + 1}
+                </div>
+                <p className="text-sm pt-0.5">{text}</p>
+              </div>
+            ))}
+            <button onClick={() => setShowModal(false)}
+              className="w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition-all">
+              Got it!
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
