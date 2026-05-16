@@ -45,9 +45,7 @@
       "url": "/app/tickets",
       "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }]
     },
-<<<<<<< HEAD
-    
-=======
+
     {
       "name": "QR Reader",
       "short_name": "Scanner",
@@ -55,6 +53,5 @@
       "url": "/scanner",
       "icons": [{ "src": "/scanner-icons/icon-96x96.png", "sizes": "96x96" }]
     }
->>>>>>> f3045cc7c7e8e6af6ca071bd0b69d040f35df90e
-  ]
+
 }
