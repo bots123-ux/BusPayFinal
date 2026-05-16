@@ -188,10 +188,7 @@ export default function Profile() {
 
           {/* Download App */}
           <DownloadAppSection />
-<<<<<<< HEAD
-=======
-          <OpenScannerSection />
->>>>>>> f3045cc7c7e8e6af6ca071bd0b69d040f35df90e
+
 
 
 
