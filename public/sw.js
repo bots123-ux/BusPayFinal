@@ -2,7 +2,16 @@ const CACHE_NAME = "buspay-v2";
 const STATIC_ASSETS = [
   "/",
   "/app",
+<<<<<<< HEAD
   "/manifest.json",
+=======
+  "/scanner",
+  "/scanner/login",
+  "/manifest.json",
+  "/scanner-manifest.json",
+  "/icons/icon-192x192.png",
+  "/icons/icon-512x512.png",
+>>>>>>> f3045cc7c7e8e6af6ca071bd0b69d040f35df90e
   "/scanner-icons/icon-192x192.png",
   "/scanner-icons/icon-512x512.png",
   "/apple-touch-icon.png",

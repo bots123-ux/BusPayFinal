@@ -30,6 +30,13 @@ import AdminPayments from "./pages/admin/AdminPayments";
 import AdminFleet from "./pages/admin/AdminFleet";
 import AdminRoutes from "./pages/admin/AdminRoutes";
 import { AdminGuard } from "./components/admin/AdminGuard";
+<<<<<<< HEAD
+=======
+import { ScannerGuard } from "./components/scanner/ScannerGuard";
+import ScannerApp from "./pages/scanner/ScannerApp";
+import ScannerHome from "./pages/scanner/ScannerHome";
+import ScannerLogin from "./pages/scanner/ScannerLogin";
+>>>>>>> f3045cc7c7e8e6af6ca071bd0b69d040f35df90e
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -77,6 +84,12 @@ const App = () => (
                 <Route path="fleet" element={<AdminFleet />} />
                 <Route path="routes" element={<AdminRoutes />} />
               </Route>
+<<<<<<< HEAD
+=======
+              <Route path="/scanner/login" element={<ScannerLogin />} />
+              <Route path="/scanner" element={<ScannerGuard><ScannerApp /></ScannerGuard>} />
+              <Route path="/scanner/scan" element={<ScannerGuard><ScannerHome /></ScannerGuard>} />
+>>>>>>> f3045cc7c7e8e6af6ca071bd0b69d040f35df90e
             </Routes>
           </BrowserRouter>
         </AuthProvider>
