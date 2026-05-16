@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- PWA Manifest -->
+    <link id="app-manifest" rel="manifest" href="/manifest.json" />
+    <script>
+      if (location.pathname.startsWith('/scanner')) {
+        document.getElementById('app-manifest')?.setAttribute('href', '/scanner-manifest.json');
+      }
+    </script>
+
+    <!-- Icons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <!-- PWA / Mobile meta -->
+    <meta name="theme-color" content="#1a3a6b" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="BusPay" />
+    <meta name="application-name" content="BusPay" />
+    <meta name="msapplication-TileColor" content="#1a3a6b" />
+    <meta name="msapplication-TileImage" content="/icons/icon-144x144.png" />
+
+    <!-- SEO -->
+    <title>BusPay — Online Bus Ticketing</title>
+    <meta name="description" content="Book bus tickets instantly. Secure cashless payments, real-time seat selection, and digital boarding QR. Manila to Baguio, La Union, Vigan, and Pagudpud." />
+    <link rel="canonical" href="/" />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="BusPay — Online Bus Ticketing" />
+    <meta property="og:description" content="Fast, secure, and easy bus ticket booking. Book now, ride anytime." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/icons/icon-512x512.png" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="BusPay — Online Bus Ticketing" />
+    <meta name="twitter:description" content="Book bus tickets in seconds. Secure, cashless, and easy." />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <!-- Register Service Worker -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('BusPay SW registered:', reg.scope))
+            .catch(err => console.warn('SW registration failed:', err));
+        });
+      }
+    </script>
+  </body>
+</html>
