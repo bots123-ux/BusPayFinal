@@ -187,7 +187,7 @@ export default function Auth() {
               </div>
             </div>
           )}
-          {(true) ? (
+          {true && (
             <form onSubmit={handleEmailSubmit} className="space-y-4">
               {mode === "signup" && (
                 <div className="space-y-1.5">
