@@ -15,7 +15,10 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 const emailSchema = z.string().email().max(254);
-const passwordSchema = z
+// Signin: only length check — never validate complexity on login
+const signinPasswordSchema = z.string().min(8, "Password must be at least 8 characters").max(128);
+// Signup: full complexity rules
+const signupPasswordSchema = z
   .string()
   .min(8, "Password must be at least 8 characters")
   .max(128)
@@ -93,7 +96,9 @@ export default function Auth() {
     if (isLocked) return;
     const cleanEmail = sanitizeEmail(email);
     if (!emailSchema.safeParse(cleanEmail).success) { toast.error("Please enter a valid email."); return; }
-    const pwResult = passwordSchema.safeParse(password);
+    // Use strict schema only for signup; signin just needs basic length
+    const schema = mode === "signup" ? signupPasswordSchema : signinPasswordSchema;
+    const pwResult = schema.safeParse(password);
     if (!pwResult.success) { toast.error(pwResult.error.errors[0]?.message || "Invalid password."); return; }
     if (mode === "signup" && password !== confirmPassword) { toast.error("Passwords do not match."); return; }
     setSubmitting(true);
