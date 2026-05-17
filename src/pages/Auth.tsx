@@ -59,7 +59,7 @@ export default function Auth() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
 
-  useEffect(() => { if (user) navigate(redirectTo, { replace: true }); }, [user, navigate]);
+  useEffect(() => { if (user) navigate(redirectTo, { replace: true }); }, [user, navigate, redirectTo]);
 
   // Update lock state when email changes — per-email throttle
   useEffect(() => {
@@ -119,7 +119,7 @@ export default function Auth() {
     if (isLocked) return;
     setSubmitting(true);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: `${window.location.origin}/app` } });
+      const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: `${window.location.origin}${redirectTo}` } });
       if (error) throw error;
     } catch (err: any) { toast.error(friendlyError(err?.message)); setSubmitting(false); }
   };
