@@ -63,7 +63,7 @@ export default function Booking() {
 
   // Payment methods
   const [savedMethods, setSavedMethods] = useState<PaymentMethod[]>([]);
-  const [gcashNumber, setGcashNumber] = useState("+63 ");
+  const [gcashNumber, setGcashNumber] = useState("");
   const [gcashName, setGcashName] = useState("");
   const [cardHolder, setCardHolder] = useState("");
   const [cardNumber, setCardNumber] = useState("");
@@ -127,7 +127,7 @@ export default function Booking() {
     const hasSaved = method === "gcash" ? !!savedGcash : !!savedCard;
     if (hasSaved) { handleConfirm(); return; }
     // Need to collect payment method info first
-    if (method === "gcash") { setGcashNumber("+63 "); setGcashName(""); }
+    if (method === "gcash") { setGcashNumber(""); setGcashName(""); }
     else { setCardHolder(""); setCardNumber(""); setCardExpiry(""); setBankName("BDO"); }
     setStep("pm-setup");
   };
@@ -135,9 +135,9 @@ export default function Booking() {
   const savePmAndConfirm = async () => {
     if (!user) return;
     if (method === "gcash") {
-      const num = gcashNumber.replace(/\s/g, "").trim();
+      const num = gcashNumber.trim();
       const name = gcashName.trim();
-      if (!/^\+63\d{10}$/.test(num)) { toast.error("Enter a valid GCash number"); return; }
+      if (!/^\+63\d{10}$/.test(num)) { toast.error("Enter a valid GCash number (+63XXXXXXXXXX)"); return; }
       if (name.length < 2) { toast.error("Enter your GCash account name"); return; }
       const { error } = await supabase.from("payment_methods").upsert(
         { user_id: user.id, type: "gcash", gcash_number: num, gcash_name: name },
@@ -205,13 +205,6 @@ export default function Booking() {
 
   const formatCardNum = (v: string) => v.replace(/\D/g, "").slice(0, 16).replace(/(.{4})/g, "$1 ").trim();
   const formatExpiry = (v: string) => { const d = v.replace(/\D/g, "").slice(0, 4); return d.length >= 3 ? d.slice(0, 2) + "/" + d.slice(2) : d; };
-  const formatGcashNumber = (v: string) => {
-    const digits = v.replace(/\D/g, "").replace(/^63/, "").slice(0, 10);
-    const formatted = digits.replace(/(\d{3})(\d{3})(\d{0,4})/, (_, a, b, c) => {
-      return c ? `${a} ${b} ${c}` : `${a} ${b}`.trim();
-    });
-    return `+63 ${formatted}`.trim();
-  };
 
   if (loading || !trip) return <div className="px-5 py-6"><CardSkeleton /></div>;
 
