@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 type Lang = "en"|"fil"|"ceb"|"ilo"|"kap"|"ja"|"ko"|"zh"|"fr"|"es"|"de"|"it"|"hi"|"th"|"vi";
 const en = {
-  "welcome.tagline":"Your cashless ticket to the road.","welcome.desc":"Fast, secure, and easy bus ticket booking for Manila-Baguio routes.","welcome.cta":"Get Started",
+  "welcome.tagline":"Your cashless ticket to the road.","welcome.desc":"Fast, secure, and easy bus ticket booking.","welcome.cta":"Get Started",
   "lang.title":"Choose your language","lang.subtitle":"You can change this later in your profile.","lang.continue":"Continue",
   "auth.signIn":"Sign in","auth.signUp":"Create account","auth.email":"Email","auth.password":"Password","auth.fullName":"Full name",
   "auth.phone":"Phone (e.g. +639171234567)","auth.continueWithGoogle":"Continue with Google","auth.sendOtp":"Send code",
