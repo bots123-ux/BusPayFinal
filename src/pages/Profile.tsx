@@ -113,15 +113,20 @@ export default function Profile() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="pf-phone">Phone</Label>
-              <div className="relative">
-                <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <div className="relative flex">
+                <span className="inline-flex h-12 items-center rounded-l-xl border border-r-0 border-input bg-secondary px-3 text-sm font-semibold text-muted-foreground select-none">+63</span>
                 <Input
                   id="pf-phone"
-                  value={phone}
-                  maxLength={16}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="h-12 rounded-xl pl-10"
-                  placeholder="+639171234567"
+                  type="tel"
+                  inputMode="numeric"
+                  value={phone.startsWith("+63") ? phone.slice(3) : phone}
+                  maxLength={10}
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
+                    setPhone("+63" + digits);
+                  }}
+                  className="h-12 rounded-l-none rounded-r-xl flex-1"
+                  placeholder="9171234567"
                 />
               </div>
             </div>

@@ -183,6 +183,13 @@ export default function Wallet() {
     return digits;
   };
 
+  const formatGcashDisplay = (digits: string) => {
+    const d = digits.replace(/\D/g, "").slice(0, 10);
+    if (d.length <= 3) return d;
+    if (d.length <= 6) return d.slice(0, 3) + " " + d.slice(3);
+    return d.slice(0, 3) + " " + d.slice(3, 6) + " " + d.slice(6);
+  };
+
   return (
     <div className="px-5 py-6">
       <h1 className="mb-5 text-2xl font-extrabold animate-fade-in">{t("wallet.title")}</h1>
@@ -291,7 +298,9 @@ export default function Wallet() {
                 </div>
                 <Label htmlFor="amount">Custom Amount</Label>
                 <Input id="amount" type="number" min={1} max={50000} value={amount}
-                  onChange={(e) => setAmount(e.target.value.slice(0, 6))}
+                  onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+                  onKeyDown={(e) => { if (!/[\d\b]/.test(e.key) && !e.ctrlKey && !e.metaKey && e.key.length === 1) e.preventDefault(); }}
+                  inputMode="numeric"
                   className="mb-5 h-12 rounded-xl text-lg font-bold" />
                 <Button variant="navy" size="lg" className="w-full" onClick={() => setStep("method-select")}
                   disabled={!amount || Number(amount) <= 0}>
@@ -338,13 +347,25 @@ export default function Wallet() {
                   This is a demo. No real GCash transaction will occur.
                 </div>
                 <div className="space-y-1.5">
-                  <Label>GCash Mobile Number</Label>
-                  <Input placeholder="+63917xxxxxxx" value={gcashNumber}
-                    onChange={(e) => setGcashNumber(e.target.value)} className="h-12 rounded-xl" maxLength={13} />
-                  <p className="text-xs text-muted-foreground">Format: +63 followed by 10 digits</p>
+                  <Label>GCash Mobile Number <span className="text-destructive">*</span></Label>
+                  <div className="flex">
+                    <span className="inline-flex h-12 items-center rounded-l-xl border border-r-0 border-input bg-secondary px-3 text-sm font-semibold text-muted-foreground select-none">+63</span>
+                    <Input
+                      placeholder="917 123 4567"
+                      inputMode="numeric"
+                      className="h-12 rounded-l-none rounded-r-xl flex-1 font-mono tracking-wider"
+                      maxLength={12}
+                      value={gcashNumber.startsWith("+63") ? formatGcashDisplay(gcashNumber.slice(3)) : formatGcashDisplay(gcashNumber)}
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
+                        setGcashNumber("+63" + digits);
+                      }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">Enter your 10-digit GCash number</p>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>GCash Account Name</Label>
+                  <Label>GCash Account Name <span className="text-destructive">*</span></Label>
                   <Input placeholder="Juan Dela Cruz" value={gcashName}
                     onChange={(e) => setGcashName(e.target.value)} className="h-12 rounded-xl" maxLength={80} />
                 </div>
@@ -372,21 +393,23 @@ export default function Wallet() {
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Cardholder Name</Label>
+                  <Label>Cardholder Name <span className="text-destructive">*</span></Label>
                   <Input placeholder="JUAN DELA CRUZ" value={cardHolder}
                     onChange={(e) => setCardHolder(e.target.value.toUpperCase())} className="h-12 rounded-xl" maxLength={60} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Card Number</Label>
+                  <Label>Card Number <span className="text-destructive">*</span></Label>
                   <Input placeholder="0000 0000 0000 0000" value={cardNumber}
                     onChange={(e) => setCardNumber(formatCardNum(e.target.value))}
-                    className="h-12 rounded-xl font-mono tracking-widest" maxLength={19} inputMode="numeric" />
+                    className="h-12 rounded-xl font-mono tracking-widest" maxLength={19} inputMode="numeric"
+                    onKeyDown={(e) => { if (!/[\d\s\b]/.test(e.key) && !e.ctrlKey && !e.metaKey && e.key.length === 1) e.preventDefault(); }} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Expiry Date</Label>
+                  <Label>Expiry Date <span className="text-destructive">*</span></Label>
                   <Input placeholder="MM/YY" value={cardExpiry}
                     onChange={(e) => setCardExpiry(formatExpiry(e.target.value))}
-                    className="h-12 rounded-xl" maxLength={5} inputMode="numeric" />
+                    className="h-12 rounded-xl" maxLength={5} inputMode="numeric"
+                    onKeyDown={(e) => { if (!/[\d/\b]/.test(e.key) && !e.ctrlKey && !e.metaKey && e.key.length === 1) e.preventDefault(); }} />
                 </div>
                 <Button variant="navy" size="lg" className="w-full" onClick={saveCard}>Save & Continue</Button>
                 <button onClick={() => setStep("method-select")} className="w-full text-center text-sm text-muted-foreground hover:text-foreground">← Back</button>

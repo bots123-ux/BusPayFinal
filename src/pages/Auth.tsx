@@ -15,7 +15,13 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 const emailSchema = z.string().email().max(254);
-const passwordSchema = z.string().min(8, "Password must be at least 8 characters").max(128);
+const passwordSchema = z
+  .string()
+  .min(8, "Password must be at least 8 characters")
+  .max(128)
+  .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+  .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+  .regex(/[^a-zA-Z0-9]/, "Password must contain at least one special character");
 const nameSchema = z.string().min(2, "Name is too short").max(80);
 const phoneSchema = z.string().regex(/^\+\d{8,15}$/, "Use international format, e.g. +63917...");
 type Mode = "signin" | "signup" | "forgot";
@@ -47,9 +53,11 @@ export default function Auth() {
   const [lockMs, setLockMs] = useState(0);
   const [otpSent, setOtpSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [forgotSent, setForgotSent] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
@@ -85,7 +93,9 @@ export default function Auth() {
     if (isLocked) return;
     const cleanEmail = sanitizeEmail(email);
     if (!emailSchema.safeParse(cleanEmail).success) { toast.error("Please enter a valid email."); return; }
-    if (!passwordSchema.safeParse(password).success) { toast.error("Password must be at least 8 characters."); return; }
+    const pwResult = passwordSchema.safeParse(password);
+    if (!pwResult.success) { toast.error(pwResult.error.errors[0]?.message || "Invalid password."); return; }
+    if (mode === "signup" && password !== confirmPassword) { toast.error("Passwords do not match."); return; }
     setSubmitting(true);
     try {
       if (mode === "signup") {
@@ -215,7 +225,7 @@ export default function Auth() {
             <form onSubmit={handleEmailSubmit} className="space-y-4">
               {mode === "signup" && (
                 <div className="space-y-1.5">
-                  <Label htmlFor="name">{t("auth.fullName")}</Label>
+                  <Label htmlFor="name">{t("auth.fullName")} <span className="text-destructive">*</span></Label>
                   <div className="relative">
                     <UserIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input id="name" autoComplete="name" value={fullName} onChange={(e) => setFullName(e.target.value)}
@@ -224,7 +234,7 @@ export default function Auth() {
                 </div>
               )}
               <div className="space-y-1.5">
-                <Label htmlFor="email">{t("auth.email")}</Label>
+                <Label htmlFor="email">{t("auth.email")} <span className="text-destructive">*</span></Label>
                 <div className="relative">
                   <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input id="email" type="email" autoComplete="email" value={email}
@@ -233,7 +243,7 @@ export default function Auth() {
               </div>
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="password">{t("auth.password")}</Label>
+                  <Label htmlFor="password">{t("auth.password")} <span className="text-destructive">*</span></Label>
                   {mode === "signin" && (
                     <button type="button" onClick={() => setMode("forgot")} className="text-xs font-semibold text-primary hover:underline">
                       Forgot password?
@@ -252,10 +262,33 @@ export default function Auth() {
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
+                {mode === "signup" && (
+                  <p className="text-xs text-muted-foreground">Must contain uppercase, lowercase, and a special character.</p>
+                )}
                 {mode === "signin" && !isLocked && attemptsRemaining(email) < 5 && (
                   <p className="text-xs text-destructive">{attemptsRemaining(email)} attempts remaining before lockout</p>
                 )}
               </div>
+              {mode === "signup" && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="confirmPassword">Confirm Password <span className="text-destructive">*</span></Label>
+                  <div className="relative">
+                    <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input id="confirmPassword" type={showConfirmPassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
+                      maxLength={128} required className="h-12 rounded-xl pl-10 pr-10" placeholder="••••••••" style={{WebkitAppearance:"none"}} />
+                    <button type="button"
+                      onMouseDown={(e) => { e.preventDefault(); setShowConfirmPassword(p => !p); }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none">
+                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  {confirmPassword && password !== confirmPassword && (
+                    <p className="text-xs text-destructive">Passwords do not match.</p>
+                  )}
+                </div>
+              )}
               <Button type="submit" variant="navy" size="lg" className="w-full" disabled={submitting || isLocked}>
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : mode === "signin" ? t("auth.signIn") : t("auth.signUp")}
               </Button>
@@ -263,12 +296,17 @@ export default function Auth() {
           ) : (
             <form onSubmit={otpSent ? handleVerifyOtp : handleSendOtp} className="space-y-4">
               <div className="space-y-1.5">
-                <Label htmlFor="phone">{t("auth.phone")}</Label>
-                <div className="relative">
-                  <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input id="phone" type="tel" autoComplete="tel" value={phone}
-                    onChange={(e) => setPhone(e.target.value)} maxLength={16} required disabled={otpSent}
-                    className="h-12 rounded-xl pl-10" placeholder="+639171234567" />
+                <Label htmlFor="phone">{t("auth.phone")} <span className="text-destructive">*</span></Label>
+                <div className="relative flex">
+                  <span className="inline-flex h-12 items-center rounded-l-xl border border-r-0 border-input bg-secondary px-3 text-sm font-semibold text-muted-foreground select-none">+63</span>
+                  <Input id="phone" type="tel" autoComplete="tel" inputMode="numeric"
+                    value={phone.startsWith("+63") ? phone.slice(3) : phone}
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
+                      setPhone("+63" + digits);
+                    }}
+                    maxLength={10} required disabled={otpSent}
+                    className="h-12 rounded-l-none rounded-r-xl flex-1" placeholder="9171234567" />
                 </div>
               </div>
               {otpSent && (
