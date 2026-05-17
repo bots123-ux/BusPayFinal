@@ -1,11 +1,33 @@
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/Logo";
 import { useI18n } from "@/lib/i18n";
 import { ShieldCheck, Zap, MapPin } from "lucide-react";
 
+const ROUTES = [
+  "Manila ⇄ Baguio",
+  "Manila ⇄ La Union",
+  "Manila ⇄ Vigan",
+  "Manila ⇄ Pagudpud",
+];
+
 export default function Welcome() {
   const { t } = useI18n();
+  const [routeIndex, setRouteIndex] = useState(0);
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setVisible(false);
+      setTimeout(() => {
+        setRouteIndex((i) => (i + 1) % ROUTES.length);
+        setVisible(true);
+      }, 400);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-gradient-hero text-primary-foreground">
       {/* Decorative road lines */}
@@ -28,9 +50,12 @@ export default function Welcome() {
         </header>
 
         <section className="my-auto flex flex-col items-center text-center">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-4 py-1.5 text-xs font-semibold text-accent backdrop-blur animate-fade-in">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />
-            Manila ⇄ Baguio
+          <div
+            className="mb-6 inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-4 py-1.5 text-xs font-semibold text-accent backdrop-blur animate-fade-in"
+            style={{ transition: "opacity 0.4s ease", opacity: visible ? 1 : 0, minWidth: "180px", justifyContent: "center" }}
+          >
+            <span className="h-2 w-2 animate-pulse rounded-full bg-accent flex-shrink-0" />
+            {ROUTES[routeIndex]}
           </div>
 
           <h1 className="mb-4 text-5xl font-extrabold tracking-tight md:text-7xl lg:text-8xl animate-slide-up">
