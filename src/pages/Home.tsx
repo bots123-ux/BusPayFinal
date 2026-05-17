@@ -140,7 +140,7 @@ export default function Home() {
       // Cache routes for 5 minutes
       let r = cacheGet<Route[]>("routes");
       if (!r) {
-        const { data } = await supabase.from("routes").select("*").eq("active", true);
+        const { data } = await supabase.from("routes").select("*").eq("active", true).order("sort_order", { ascending: true });
         r = data ?? [];
         cacheSet("routes", r);
       }
