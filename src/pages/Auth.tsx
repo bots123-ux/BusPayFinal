@@ -38,9 +38,9 @@ function friendlyError(msg: string): string {
   if (!msg) return "Something went wrong. Please try again.";
   if (msg.includes("rate limit")) return "Too many requests. Please wait a few minutes and try again.";
   if (msg.includes("Email not confirmed")) return "Please check your email to confirm your account first.";
-  if (msg.includes("Invalid login credentials")) return "Incorrect email or password. Please try again.";
+  if (msg.includes("Invalid login credentials")) return "Incorrect password. Please try again.";
   if (msg.includes("User already registered")) return "This email is already registered. Try signing in instead.";
-  if (msg.includes("Password should be")) return "Password must be at least 8 characters.";
+  if (msg.includes("Password should be")) return "Incorrect password. Please try again.";
   return msg;
 }
 
@@ -96,11 +96,12 @@ export default function Auth() {
     if (isLocked) return;
     const cleanEmail = sanitizeEmail(email);
     if (!emailSchema.safeParse(cleanEmail).success) { toast.error("Please enter a valid email."); return; }
-    // Use strict schema only for signup; signin just needs basic length
-    const schema = mode === "signup" ? signupPasswordSchema : signinPasswordSchema;
-    const pwResult = schema.safeParse(password);
-    if (!pwResult.success) { toast.error(pwResult.error.errors[0]?.message || "Invalid password."); return; }
-    if (mode === "signup" && password !== confirmPassword) { toast.error("Passwords do not match."); return; }
+    // For signup only: validate password complexity before hitting Supabase
+    if (mode === "signup") {
+      const pwResult = signupPasswordSchema.safeParse(password);
+      if (!pwResult.success) { toast.error(pwResult.error.errors[0]?.message || "Invalid password."); return; }
+      if (password !== confirmPassword) { toast.error("Passwords do not match."); return; }
+    }
     setSubmitting(true);
     try {
       if (mode === "signup") {
@@ -270,8 +271,8 @@ export default function Auth() {
                 {mode === "signup" && (
                   <p className="text-xs text-muted-foreground">Must contain uppercase, lowercase, and a special character.</p>
                 )}
-                {mode === "signin" && !isLocked && attemptsRemaining(email) < 5 && (
-                  <p className="text-xs text-destructive">{attemptsRemaining(email)} attempts remaining before lockout</p>
+                {mode === "signin" && !isLocked && attemptsRemaining(email) < 5 && attemptsRemaining(email) > 0 && (
+                  <p className="text-xs text-destructive">⚠ {attemptsRemaining(email)} attempt{attemptsRemaining(email) === 1 ? "" : "s"} remaining — too many failures will lock this account.</p>
                 )}
               </div>
               {mode === "signup" && (
