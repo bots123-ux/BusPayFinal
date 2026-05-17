@@ -147,7 +147,7 @@ export default function Wallet() {
   const handleTopup = async () => {
     if (!user) return;
     const amt = Number(amount);
-    if (!Number.isFinite(amt) || amt <= 0 || amt > 50000) { toast.error("Enter a valid amount (₱1 – ₱50,000)."); return; }
+    if (!Number.isFinite(amt) || amt <= 0 || amt > 50000) { toast.error("Enter a valid amount (₱1 – ₱50,000). Maximum single top-up is ₱50,000."); return; }
     setSubmitting(true);
     try {
       const { data: ok, error } = await supabase.rpc("topup_wallet", {
@@ -298,7 +298,11 @@ export default function Wallet() {
                 </div>
                 <Label htmlFor="amount">Custom Amount</Label>
                 <Input id="amount" type="number" min={1} max={50000} value={amount}
-                  onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/[^0-9]/g, "").slice(0, 5);
+                    const num = Number(raw);
+                    setAmount(num > 50000 ? "50000" : raw);
+                  }}
                   onKeyDown={(e) => { if (!/[\d\b]/.test(e.key) && !e.ctrlKey && !e.metaKey && e.key.length === 1) e.preventDefault(); }}
                   inputMode="numeric"
                   className="mb-5 h-12 rounded-xl text-lg font-bold" />

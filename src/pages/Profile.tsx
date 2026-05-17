@@ -32,12 +32,16 @@ export default function Profile() {
     (async () => {
       const { data } = await supabase
         .from("passenger")
-        .select("full_name, email, phone")
+        .select("full_name, email, phone, language")
         .eq("user_id", user.id)
         .maybeSingle();
       setFullName(data?.full_name ?? "");
       setEmail(data?.email ?? user.email ?? "");
       setPhone(data?.phone ?? "");
+      // Restore saved language from DB and apply it everywhere
+      if (data?.language) {
+        setLang(data.language as any);
+      }
       setLoading(false);
     })();
   }, [user]);
@@ -156,7 +160,13 @@ export default function Profile() {
                   <button
                     key={l.code}
                     type="button"
-                    onClick={() => setLang(l.code)}
+                    onClick={() => {
+                      setLang(l.code);
+                      // Immediately persist to DB so all sessions/refreshes reflect the choice
+                      if (user) {
+                        supabase.from("passenger").update({ language: l.code }).eq("user_id", user.id);
+                      }
+                    }}
                     style={{ minHeight: 44 }}
                     className={cn(
                       "flex items-center gap-2 rounded-xl border-2 px-3 text-sm font-semibold transition-all",
