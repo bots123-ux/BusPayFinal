@@ -4,8 +4,8 @@ import { ArrowLeft, ChevronDown } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { cn } from "@/lib/utils";
 const FAQS=[
-  {q:"How do I book a ticket?",a:"Go to the Home tab, select your route (Manila to Baguio or Baguio to Manila), choose a travel date, pick a departure time, select your seat, and complete your payment."},
-  {q:"What payment methods are accepted?",a:"We accept Cash (pay on boarding), GCash (instant digital payment), and BusPay Wallet (top up with GCash or card)."},
+  {q:"How do I book a ticket?",a:"Go to the Home tab, select your route, choose a travel date, pick a departure time, select your seat, and complete your payment."},
+  {q:"What payment methods are accepted?",a:"we accept GCash (instant digital payment), and BusPay Wallet (online banking)."},
   {q:"Can I cancel or refund my ticket?",a:"Tickets can be cancelled up to 2 hours before departure. Refunds are processed within 3-5 business days to your BusPay Wallet or original payment method."},
   {q:"How does real-time seat selection work?",a:"When choosing a seat, the map updates live as other passengers book. Green seats are available, blue is your selection, and red/grey seats are taken. Your seat is reserved once payment is confirmed."},
   {q:"What is the QR code on my ticket for?",a:"The QR code is your digital boarding pass. Show it to the bus staff when boarding - they will scan it to verify your ticket. No need to print anything."},
@@ -13,7 +13,7 @@ const FAQS=[
   {q:"What if I miss my bus?",a:"If you miss your scheduled departure, please contact the bus terminal directly. Missed trips are subject to the bus operator rebooking policy."},
   {q:"Is my payment information secure?",a:"Yes. BusPay uses bank-level encryption and never stores your full payment details. All transactions go through secure payment processors."},
   {q:"Can I book for multiple passengers?",a:"Yes! When selecting seats, you can increase the passenger count and select a seat for each person during the booking process."},
-  {q:"How do I change my language?",a:"Go to Profile then Language, or change it on the Language selection screen before logging in. BusPay supports English, Filipino, Cebuano, Ilocano, and Kapampangan."},
+  {q:"How do I change my language?",a:"Go to Profile then Language, or change it on the Language selection screen before logging in or later edit it in profile."},
 ];
 export default function FAQ() {
   const navigate=useNavigate();
