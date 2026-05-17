@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { LogOut, Loader2, Globe, User as UserIcon, Mail, Phone, FileText, HelpCircle, CreditCard, MapPin, ChevronRight, Download, Smartphone, Share } from "lucide-react";
+import { LogOut, Loader2, Globe, User as UserIcon, Mail, FileText, HelpCircle, CreditCard, MapPin, ChevronRight, Download, Smartphone, Share } from "lucide-react";
 import { Link } from "react-router-dom";
 import { z } from "zod";
 import { useAuth } from "@/lib/auth";
@@ -10,12 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CardSkeleton } from "@/components/Skeleton";
-import { sanitizeText, sanitizePhone } from "@/lib/sanitize";
+import { sanitizeText } from "@/lib/sanitize";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 const nameSchema = z.string().min(2).max(80);
-const phoneSchema = z.string().regex(/^\+\d{8,15}$/).or(z.literal(""));
 
 export default function Profile() {
   const { user, signOut } = useAuth();
@@ -25,19 +24,17 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
 
   useEffect(() => {
     if (!user) return;
     (async () => {
       const { data } = await supabase
         .from("passenger")
-        .select("full_name, email, phone, language")
+        .select("full_name, email, language")
         .eq("user_id", user.id)
         .maybeSingle();
       setFullName(data?.full_name ?? "");
       setEmail(data?.email ?? user.email ?? "");
-      setPhone(data?.phone ?? "");
       // Restore saved language from DB and apply it everywhere
       if (data?.language) {
         setLang(data.language as any);
@@ -49,22 +46,16 @@ export default function Profile() {
   const handleSave = async () => {
     if (!user) return;
     const cleanName = sanitizeText(fullName, 80);
-    const cleanPhone = sanitizePhone(phone);
     const nv = nameSchema.safeParse(cleanName);
     if (!nv.success) {
       toast.error("Please enter a valid name (2–80 characters).");
-      return;
-    }
-    const pv = phoneSchema.safeParse(cleanPhone);
-    if (!pv.success) {
-      toast.error("Phone must be in international format, e.g. +639171234567 — or leave blank.");
       return;
     }
     setSaving(true);
     try {
       const { error } = await supabase
         .from("passenger")
-        .update({ full_name: cleanName, phone: cleanPhone || null, language: lang })
+        .update({ full_name: cleanName, language: lang })
         .eq("user_id", user.id);
       if (error) throw error;
       toast.success("Profile updated");
@@ -115,26 +106,6 @@ export default function Profile() {
                 <Input id="pf-email" value={email} disabled className="h-12 rounded-xl pl-10 bg-secondary" />
               </div>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="pf-phone">Phone</Label>
-              <div className="relative flex">
-                <span className="inline-flex h-12 items-center rounded-l-xl border border-r-0 border-input bg-secondary px-3 text-sm font-semibold text-muted-foreground select-none">+63</span>
-                <Input
-                  id="pf-phone"
-                  type="tel"
-                  inputMode="numeric"
-                  value={phone.startsWith("+63") ? phone.slice(3) : phone}
-                  maxLength={10}
-                  onChange={(e) => {
-                    const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
-                    setPhone("+63" + digits);
-                  }}
-                  className="h-12 rounded-l-none rounded-r-xl flex-1"
-                  placeholder="9171234567"
-                />
-              </div>
-            </div>
-
             <div className="space-y-1.5">
               <Label className="flex items-center gap-2">
                 <Globe className="h-4 w-4" /> Language
