@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import { format } from "date-fns";
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "@/integrations/supabase/client";
-import { formatTime12h } from "@/lib/time";
+import { formatTime12h, arrivalTime, formatDuration } from "@/lib/time";
 import { CardSkeleton } from "@/components/Skeleton";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
@@ -20,7 +20,7 @@ interface Detail {
   trips: {
     travel_date: string;
     departure_time: string;
-    routes: { origin: string; destination: string; duration_minutes: number };
+    routes: { origin: string; destination: string; duration_minutes: number; distance_km: number | null };
     buses: { plate_number: string; model: string | null };
   };
 }
@@ -39,7 +39,7 @@ export default function TicketDetail() {
       const { data: row } = await supabase
         .from("ticket")
         .select(
-          "id, seat_number, status, price_php, qr_code, created_at, trips(travel_date, departure_time, routes(origin, destination, duration_minutes), buses(plate_number, model))",
+          "id, seat_number, status, price_php, qr_code, created_at, trips(travel_date, departure_time, routes(origin, destination, duration_minutes, distance_km), buses(plate_number, model))",
         )
         .eq("id", id)
         .eq("user_id", user.id)
@@ -105,10 +105,13 @@ export default function TicketDetail() {
         {/* Details */}
         <div className="grid grid-cols-3 gap-4 p-6">
           <Cell label="Departure" value={formatTime12h(data.trips.departure_time)} />
+          <Cell label="Arrival (est.)" value={arrivalTime(data.trips.departure_time, data.trips.routes.duration_minutes)} />
           <Cell label="Seat" value={`#${data.seat_number}`} />
+          <Cell label="Duration" value={formatDuration(data.trips.routes.duration_minutes)} />
+          <Cell label="Distance" value={data.trips.routes.distance_km ? `${data.trips.routes.distance_km} km` : "—"} />
           <Cell label="Status" value={data.status} />
           <Cell label="Bus" value={data.trips.buses.plate_number} />
-          <Cell label="Duration" value={`${Math.round(data.trips.routes.duration_minutes / 60)}h`} />
+          <Cell label="Model" value={data.trips.buses.model ?? "—"} />
           <Cell label="Total" value={`₱${Number(data.price_php).toLocaleString()}`} />
         </div>
       </article>

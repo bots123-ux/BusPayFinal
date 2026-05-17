@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Calendar, Clock, MapPin, ArrowRight, Bus, Loader2 } from "lucide-react";
-import { formatTime12h } from "@/lib/time";
+import { formatTime12h, formatDuration } from "@/lib/time";
 import { cacheGet, cacheSet } from "@/lib/cache";
 import { format } from "date-fns";
 import { useAuth } from "@/lib/auth";
@@ -222,7 +222,7 @@ export default function Home() {
         </div>
         {currentRoute && (
           <p className="mt-2 text-sm text-primary-foreground/70">
-            ₱{Number(currentRoute.price_php).toLocaleString()} · ~{Math.round(currentRoute.duration_minutes / 60)}h
+            ₱{Number(currentRoute.price_php).toLocaleString()} · {formatDuration(currentRoute.duration_minutes)}
           </p>
         )}
       </section>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { formatTime12h } from "@/lib/time";
+import { formatTime12h, arrivalTime, formatDuration } from "@/lib/time";
 import { ArrowLeft, Loader2, Wallet as WalletIcon, Smartphone, Check, CreditCard, X, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import { useAuth } from "@/lib/auth";
@@ -278,6 +278,8 @@ export default function Booking() {
               <div className="flex justify-between"><span className="text-muted-foreground">Route</span><span className="font-semibold">{trip.routes.origin} → {trip.routes.destination}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Date</span><span className="font-semibold">{format(new Date(trip.travel_date), "PP")}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Departure</span><span className="font-semibold">{formatTime12h(trip.departure_time)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Arrival (est.)</span><span className="font-semibold">{arrivalTime(trip.departure_time, trip.routes.duration_minutes)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Duration</span><span className="font-semibold">{formatDuration(trip.routes.duration_minutes)}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Seat(s)</span><span className="font-semibold">#{selectedSeats.join(", #")}</span></div>
             </div>
           </div>

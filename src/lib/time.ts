@@ -1,3 +1,10 @@
+/** Format duration minutes → "3h 50m" */
+export function formatDuration(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
 
 /** Convert "06:00" or "06:00:00" → "6:00 AM" */
 export function formatTime12h(time24: string): string {
