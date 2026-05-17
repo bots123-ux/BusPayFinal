@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { z } from "zod";
-import { Mail, Phone, Lock, User as UserIcon, AlertCircle, Loader2, ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, User as UserIcon, AlertCircle, Loader2, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,7 +9,7 @@ import { Logo } from "@/components/Logo";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
-import { sanitizeEmail, sanitizePhone, sanitizeText } from "@/lib/sanitize";
+import { sanitizeEmail, sanitizeText } from "@/lib/sanitize";
 import { attemptsRemaining, clearAttempts, getLockRemainingMs, recordFailedAttempt } from "@/lib/loginThrottle";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -26,9 +26,7 @@ const signupPasswordSchema = z
   .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
   .regex(/[^a-zA-Z0-9]/, "Password must contain at least one special character");
 const nameSchema = z.string().min(2, "Name is too short").max(80);
-const phoneSchema = z.string().regex(/^\+\d{8,15}$/, "Use international format, e.g. +63917...");
 type Mode = "signin" | "signup" | "forgot";
-type Method = "email" | "phone";
 
 function formatTime(ms: number) {
   const total = Math.ceil(ms / 1000);
@@ -51,10 +49,8 @@ export default function Auth() {
   const [search] = useSearchParams();
   const redirectTo = search.get("redirect") || "/app";
   const [mode, setMode] = useState<Mode>(search.get("mode") === "signup" ? "signup" : "signin");
-  const [method, setMethod] = useState<Method>("email");
   const [submitting, setSubmitting] = useState(false);
   const [lockMs, setLockMs] = useState(0);
-  const [otpSent, setOtpSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [forgotSent, setForgotSent] = useState(false);
@@ -62,8 +58,6 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState("");
 
   useEffect(() => { if (user) navigate(redirectTo, { replace: true }); }, [user, navigate]);
 
@@ -130,31 +124,6 @@ export default function Auth() {
     } catch (err: any) { toast.error(friendlyError(err?.message)); setSubmitting(false); }
   };
 
-  const handleSendOtp = async (e: FormEvent) => {
-    e.preventDefault();
-    if (isLocked) return;
-    const cleanPhone = sanitizePhone(phone);
-    if (!phoneSchema.safeParse(cleanPhone).success) { toast.error("Use international format, e.g. +63917..."); return; }
-    setSubmitting(true);
-    try {
-      const { error } = await supabase.auth.signInWithOtp({ phone: cleanPhone });
-      if (error) throw error;
-      setOtpSent(true); toast.success("Code sent!");
-    } catch (err: any) { toast.error(friendlyError(err?.message)); }
-    finally { setSubmitting(false); }
-  };
-
-  const handleVerifyOtp = async (e: FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
-    try {
-      const { error } = await supabase.auth.verifyOtp({ phone: sanitizePhone(phone), token: otp.replace(/\D/g, "").slice(0, 6), type: "sms" });
-      if (error) { const r = recordFailedAttempt(phone); if (r.locked) setLockMs(r.remainingMs); throw error; }
-      clearAttempts(phone); navigate("/app", { replace: true });
-    } catch (err: any) { toast.error(friendlyError(err?.message)); }
-    finally { setSubmitting(false); }
-  };
-
   if (mode === "forgot") return (
     <main className="min-h-screen bg-background">
       <div className="mx-auto flex min-h-screen max-w-md flex-col px-6 py-8">
@@ -218,16 +187,7 @@ export default function Auth() {
               </div>
             </div>
           )}
-          <div className="mb-5 grid grid-cols-2 gap-2 rounded-2xl bg-secondary p-1">
-            {(["email", "phone"] as const).map((m) => (
-              <button key={m} onClick={() => { setMethod(m); setOtpSent(false); }}
-                className={cn("rounded-xl px-4 py-2 text-sm font-semibold transition-all",
-                  method === m ? "bg-card text-primary shadow-soft" : "text-muted-foreground")}>
-                {m === "email" ? "Email" : "Phone"}
-              </button>
-            ))}
-          </div>
-          {method === "email" ? (
+          {(true) ? (
             <form onSubmit={handleEmailSubmit} className="space-y-4">
               {mode === "signup" && (
                 <div className="space-y-1.5">
@@ -298,35 +258,6 @@ export default function Auth() {
               <Button type="submit" variant="navy" size="lg" className="w-full" disabled={submitting || isLocked}>
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : mode === "signin" ? t("auth.signIn") : t("auth.signUp")}
               </Button>
-            </form>
-          ) : (
-            <form onSubmit={otpSent ? handleVerifyOtp : handleSendOtp} className="space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="phone">{t("auth.phone")} <span className="text-destructive">*</span></Label>
-                <div className="relative flex">
-                  <span className="inline-flex h-12 items-center rounded-l-xl border border-r-0 border-input bg-secondary px-3 text-sm font-semibold text-muted-foreground select-none">+63</span>
-                  <Input id="phone" type="tel" autoComplete="tel" inputMode="numeric"
-                    value={phone.startsWith("+63") ? phone.slice(3) : phone}
-                    onChange={(e) => {
-                      const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
-                      setPhone("+63" + digits);
-                    }}
-                    maxLength={10} required disabled={otpSent}
-                    className="h-12 rounded-l-none rounded-r-xl flex-1" placeholder="9171234567" />
-                </div>
-              </div>
-              {otpSent && (
-                <div className="space-y-1.5">
-                  <Label htmlFor="otp">{t("auth.otp")}</Label>
-                  <Input id="otp" inputMode="numeric" value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g,"").slice(0,6))}
-                    maxLength={6} required className="h-12 rounded-xl text-center text-2xl tracking-[0.5em] font-mono" placeholder="000000" />
-                </div>
-              )}
-              <Button type="submit" variant="navy" size="lg" className="w-full" disabled={submitting || isLocked}>
-                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : otpSent ? t("auth.verifyOtp") : t("auth.sendOtp")}
-              </Button>
-              {otpSent && <button type="button" onClick={() => setOtpSent(false)} className="block w-full text-center text-xs text-muted-foreground hover:text-foreground">Use a different number</button>}
             </form>
           )}
           <div className="my-6 flex items-center gap-3">
