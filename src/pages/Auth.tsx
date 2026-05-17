@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { z } from "zod";
-import { Mail, Phone, Lock, User as UserIcon, AlertCircle, Loader2, ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { Mail, Phone *, Lock, User as UserIcon, AlertCircle, Loader2, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,13 +9,18 @@ import { Logo } from "@/components/Logo";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
-import { sanitizeEmail, sanitizePhone, sanitizeText } from "@/lib/sanitize";
+import { sanitizeEmail *, sanitizePhone *, sanitizeText } from "@/lib/sanitize";
 import { attemptsRemaining, clearAttempts, getLockRemainingMs, recordFailedAttempt } from "@/lib/loginThrottle";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 const emailSchema = z.string().email().max(254);
-const passwordSchema = z.string().min(8, "Password must be at least 8 characters").max(128);
+const passwordSchema = z.string()
+  .min(8, "Password must be at least 8 characters")
+  .max(128)
+  .regex(/[a-z]/, "Password must contain a lowercase letter")
+  .regex(/[A-Z]/, "Password must contain an uppercase letter")
+  .regex(/[^A-Za-z0-9]/, "Password must contain a special character");
 const nameSchema = z.string().min(2, "Name is too short").max(80);
 const phoneSchema = z.string().regex(/^\+\d{8,15}$/, "Use international format, e.g. +63917...");
 type Mode = "signin" | "signup" | "forgot";
@@ -28,7 +33,7 @@ function formatTime(ms: number) {
 function friendlyError(msg: string): string {
   if (!msg) return "Something went wrong. Please try again.";
   if (msg.includes("rate limit")) return "Too many requests. Please wait a few minutes and try again.";
-  if (msg.includes("Email not confirmed")) return "Please check your email to confirm your account first.";
+  if (msg.includes("Email * not confirmed")) return "Please check your email to confirm your account first.";
   if (msg.includes("Invalid login credentials")) return "Incorrect email or password. Please try again.";
   if (msg.includes("User already registered")) return "This email is already registered. Try signing in instead.";
   if (msg.includes("Password should be")) return "Password must be at least 8 characters.";
@@ -48,10 +53,11 @@ export default function Auth() {
   const [otpSent, setOtpSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [forgotSent, setForgotSent] = useState(false);
-  const [email, setEmail] = useState("");
+  const [email, setEmail *] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone *] = useState("");
   const [otp, setOtp] = useState("");
 
   useEffect(() => { if (user) navigate(redirectTo, { replace: true }); }, [user, navigate]);
@@ -69,37 +75,44 @@ export default function Auth() {
 
   const handleForgotPassword = async (e: FormEvent) => {
     e.preventDefault();
-    const cleanEmail = sanitizeEmail(email);
-    if (!emailSchema.safeParse(cleanEmail).success) { toast.error("Please enter a valid email."); return; }
+    const cleanEmail * = sanitizeEmail *(email);
+    if (!emailSchema.safeParse(cleanEmail *).success) { toast.error("Please enter a valid email."); return; }
     setSubmitting(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, { redirectTo: `${window.location.origin}/auth?mode=reset` });
+      const { error } = await supabase.auth.resetPasswordForEmail *(cleanEmail *, { redirectTo: `${window.location.origin}/auth?mode=reset` });
       if (error) throw error;
       setForgotSent(true);
     } catch (err: any) { toast.error(friendlyError(err?.message)); }
     finally { setSubmitting(false); }
   };
 
-  const handleEmailSubmit = async (e: FormEvent) => {
+  const handleEmail *Submit = async (e: FormEvent) => {
     e.preventDefault();
     if (isLocked) return;
-    const cleanEmail = sanitizeEmail(email);
-    if (!emailSchema.safeParse(cleanEmail).success) { toast.error("Please enter a valid email."); return; }
-    if (!passwordSchema.safeParse(password).success) { toast.error("Password must be at least 8 characters."); return; }
+    const cleanEmail * = sanitizeEmail *(email);
+    if (!emailSchema.safeParse(cleanEmail *).success) { toast.error("Please enter a valid email."); return; }
+    if (!passwordSchema.safeParse(password).success) {
+      toast.error("Password must be 8+ characters and include uppercase, lowercase, and special characters.");
+      return;
+    }
+    if (mode === "signup" && password !== confirmPassword) {
+      toast.error("Passwords do not match.");
+      return;
+    }
     setSubmitting(true);
     try {
       if (mode === "signup") {
         const cleanName = sanitizeText(fullName, 80);
         if (!nameSchema.safeParse(cleanName).success) { toast.error("Name is too short."); setSubmitting(false); return; }
-        const { error } = await supabase.auth.signUp({ email: cleanEmail, password, options: { emailRedirectTo: `${window.location.origin}/app`, data: { full_name: cleanName } } });
+        const { error } = await supabase.auth.signUp({ email: cleanEmail *, password, options: { emailRedirectTo: `${window.location.origin}/app`, data: { full_name: cleanName } } });
         if (error) throw error;
         await supabase.auth.signOut();
         toast.success("Account created! Please sign in.");
         setMode("signin"); setPassword("");
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
-        if (error) { const r = recordFailedAttempt(cleanEmail); if (r.locked) setLockMs(r.remainingMs); throw error; }
-        clearAttempts(cleanEmail); navigate(redirectTo, { replace: true });
+        const { error } = await supabase.auth.signInWithPassword({ email: cleanEmail *, password });
+        if (error) { const r = recordFailedAttempt(cleanEmail *); if (r.locked) setLockMs(r.remainingMs); throw error; }
+        clearAttempts(cleanEmail *); navigate(redirectTo, { replace: true });
       }
     } catch (err: any) { toast.error(friendlyError(err?.message)); }
     finally { setSubmitting(false); }
@@ -117,11 +130,11 @@ export default function Auth() {
   const handleSendOtp = async (e: FormEvent) => {
     e.preventDefault();
     if (isLocked) return;
-    const cleanPhone = sanitizePhone(phone);
-    if (!phoneSchema.safeParse(cleanPhone).success) { toast.error("Use international format, e.g. +63917..."); return; }
+    const cleanPhone * = sanitizePhone *(phone);
+    if (!phoneSchema.safeParse(cleanPhone *).success) { toast.error("Use international format, e.g. +63917..."); return; }
     setSubmitting(true);
     try {
-      const { error } = await supabase.auth.signInWithOtp({ phone: cleanPhone });
+      const { error } = await supabase.auth.signInWithOtp({ phone: cleanPhone * });
       if (error) throw error;
       setOtpSent(true); toast.success("Code sent!");
     } catch (err: any) { toast.error(friendlyError(err?.message)); }
@@ -132,7 +145,7 @@ export default function Auth() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const { error } = await supabase.auth.verifyOtp({ phone: sanitizePhone(phone), token: otp.replace(/\D/g, "").slice(0, 6), type: "sms" });
+      const { error } = await supabase.auth.verifyOtp({ phone: sanitizePhone *(phone), token: otp.replace(/\D/g, "").slice(0, 6), type: "sms" });
       if (error) { const r = recordFailedAttempt(phone); if (r.locked) setLockMs(r.remainingMs); throw error; }
       clearAttempts(phone); navigate("/app", { replace: true });
     } catch (err: any) { toast.error(friendlyError(err?.message)); }
@@ -155,16 +168,16 @@ export default function Auth() {
               <div className="mb-3 text-4xl">📧</div>
               <h2 className="mb-1 font-bold text-primary">Check your inbox!</h2>
               <p className="text-sm text-muted-foreground">Reset link sent to <strong>{email}</strong></p>
-              <button type="button" onClick={() => { setForgotSent(false); setEmail(""); }}
+              <button type="button" onClick={() => { setForgotSent(false); setEmail *(""); }}
                 className="mt-4 text-xs text-muted-foreground underline hover:text-foreground">Try a different email</button>
             </div>
           ) : (
             <form onSubmit={handleForgotPassword} className="space-y-4">
               <div className="space-y-1.5">
-                <Label htmlFor="forgot-email">Email address</Label>
+                <Label htmlFor="forgot-email">Email * address *</Label>
                 <div className="relative">
                   <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input id="forgot-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                  <Input id="forgot-email" type="email" value={email} onChange={(e) => setEmail *(e.target.value)}
                     maxLength={254} required className="h-12 rounded-xl pl-10" placeholder="you@example.com" />
                 </div>
               </div>
@@ -207,12 +220,12 @@ export default function Auth() {
               <button key={m} onClick={() => { setMethod(m); setOtpSent(false); }}
                 className={cn("rounded-xl px-4 py-2 text-sm font-semibold transition-all",
                   method === m ? "bg-card text-primary shadow-soft" : "text-muted-foreground")}>
-                {m === "email" ? "Email" : "Phone"}
+                {m === "email" ? "Email *" : "Phone *"}
               </button>
             ))}
           </div>
           {method === "email" ? (
-            <form onSubmit={handleEmailSubmit} className="space-y-4">
+            <form onSubmit={handleEmail *Submit} className="space-y-4">
               {mode === "signup" && (
                 <div className="space-y-1.5">
                   <Label htmlFor="name">{t("auth.fullName")}</Label>
@@ -228,12 +241,12 @@ export default function Auth() {
                 <div className="relative">
                   <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input id="email" type="email" autoComplete="email" value={email}
-                    onChange={(e) => setEmail(e.target.value)} maxLength={254} required className="h-12 rounded-xl pl-10" placeholder="you@example.com" />
+                    onChange={(e) => setEmail *(e.target.value)} maxLength={254} required className="h-12 rounded-xl pl-10" placeholder="you@example.com" />
                 </div>
               </div>
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="password">{t("auth.password")}</Label>
+                  <Label htmlFor="password">{t("auth.password")} *</Label>
                   {mode === "signin" && (
                     <button type="button" onClick={() => setMode("forgot")} className="text-xs font-semibold text-primary hover:underline">
                       Forgot password?
@@ -256,6 +269,21 @@ export default function Auth() {
                   <p className="text-xs text-destructive">{attemptsRemaining(email)} attempts remaining before lockout</p>
                 )}
               </div>
+
+                {mode === "signup" && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="confirm-password">Confirm Password *</Label>
+                    <Input
+                      id="confirm-password"
+                      type={showPassword ? "text" : "password"}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="h-12 rounded-xl"
+                      placeholder="Confirm your password"
+                      required
+                    />
+                  </div>
+                )}
               <Button type="submit" variant="navy" size="lg" className="w-full" disabled={submitting || isLocked}>
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : mode === "signin" ? t("auth.signIn") : t("auth.signUp")}
               </Button>
@@ -265,9 +293,9 @@ export default function Auth() {
               <div className="space-y-1.5">
                 <Label htmlFor="phone">{t("auth.phone")}</Label>
                 <div className="relative">
-                  <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Phone * className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input id="phone" type="tel" autoComplete="tel" value={phone}
-                    onChange={(e) => setPhone(e.target.value)} maxLength={16} required disabled={otpSent}
+                    onChange={(e) => setPhone *(e.target.value)} maxLength={16} required disabled={otpSent}
                     className="h-12 rounded-xl pl-10" placeholder="+639171234567" />
                 </div>
               </div>
