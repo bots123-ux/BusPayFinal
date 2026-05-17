@@ -20,13 +20,19 @@ import { Logo } from "@/components/Logo";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
-import { sanitizeEmail, sanitizePhone, sanitizeText } from "@/lib/sanitize";
+import {
+  sanitizeEmail,
+  sanitizePhone,
+  sanitizeText,
+} from "@/lib/sanitize";
+
 import {
   attemptsRemaining,
   clearAttempts,
   getLockRemainingMs,
   recordFailedAttempt,
 } from "@/lib/loginThrottle";
+
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -51,6 +57,7 @@ type Method = "email" | "phone";
 
 function formatTime(ms: number) {
   const total = Math.ceil(ms / 1000);
+
   return `${Math.floor(total / 60)}:${(total % 60)
     .toString()
     .padStart(2, "0")}`;
@@ -58,14 +65,23 @@ function formatTime(ms: number) {
 
 function friendlyError(msg: string): string {
   if (!msg) return "Something went wrong. Please try again.";
-  if (msg.includes("rate limit"))
+
+  if (msg.includes("rate limit")) {
     return "Too many requests. Please wait a few minutes and try again.";
-  if (msg.includes("Email not confirmed"))
+  }
+
+  if (msg.includes("Email not confirmed")) {
     return "Please check your email to confirm your account first.";
-  if (msg.includes("Invalid login credentials"))
+  }
+
+  if (msg.includes("Invalid login credentials")) {
     return "Incorrect email or password. Please try again.";
-  if (msg.includes("User already registered"))
+  }
+
+  if (msg.includes("User already registered")) {
     return "This email is already registered. Try signing in instead.";
+  }
+
   return msg;
 }
 
@@ -83,6 +99,7 @@ export default function Auth() {
   );
 
   const [method, setMethod] = useState<Method>("email");
+
   const [submitting, setSubmitting] = useState(false);
   const [lockMs, setLockMs] = useState(0);
   const [otpSent, setOtpSent] = useState(false);
@@ -98,7 +115,7 @@ export default function Auth() {
 
   useEffect(() => {
     if (user) navigate(redirectTo, { replace: true });
-  }, [user, navigate]);
+  }, [user, navigate, redirectTo]);
 
   useEffect(() => {
     if (email) setLockMs(getLockRemainingMs(email));
@@ -109,13 +126,14 @@ export default function Auth() {
 
     const timer = setInterval(() => {
       const r = getLockRemainingMs(email);
+
       setLockMs(r);
 
       if (r <= 0) clearInterval(timer);
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [lockMs]);
+  }, [lockMs, email]);
 
   const isLocked = lockMs > 0 && mode === "signin";
 
