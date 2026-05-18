@@ -7,7 +7,7 @@ const FAQS=[
   {q:"How do I book a ticket?",a:"Go to the Home tab, select your route, choose a travel date, pick a departure time, select your seat, and complete your payment."},
   {q:"What payment methods are accepted?",a:"we accept GCash (instant digital payment), and BusPay Wallet (online banking)."},
   {q:"Can I cancel or refund my ticket?",a:"Tickets can be cancelled up to 2 hours before departure. Refunds are processed within 3-5 business days to your BusPay Wallet or original payment method."},
-  {q:"How does real-time seat selection work?",a:"When choosing a seat, the map updates live as other passengers book. Green seats are available, blue is your selection, and red/grey seats are taken. Your seat is reserved once payment is confirmed."},
+  {q:"How does real-time seat selection work?",a:"When choosing a seat, the map updates live as other passengers book. Green seats are available, orange is your selection, and grey seats are taken. Your seat is reserved once payment is confirmed."},
   {q:"What is the QR code on my ticket for?",a:"The QR code is your digital boarding pass. Show it to the bus staff when boarding - they will scan it to verify your ticket. No need to print anything."},
   {q:"How do I top up my BusPay Wallet?",a:"Go to the Wallet tab, tap Top Up, enter the amount (1 to 50000 pesos), select GCash or Card as your payment method, and confirm. Balance is added instantly."},
   {q:"What if I miss my bus?",a:"If you miss your scheduled departure, please contact the bus terminal directly. Missed trips are subject to the bus operator rebooking policy."},

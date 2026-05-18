@@ -2,9 +2,6 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Banknote, Smartphone, Wallet, CreditCard, ShieldCheck } from "lucide-react";
 import { Logo } from "@/components/Logo";
 const METHODS=[
-  {icon:Banknote,name:"Cash on Boarding",desc:"Pay directly to the bus conductor when you board. No digital setup required.",
-   steps:["Book your ticket and select Cash as payment","Show your QR code when boarding","Pay the conductor the exact fare amount","Keep your ticket as proof of payment"],
-   note:"Cash tickets are marked Pending until payment is collected on board.",color:"bg-emerald-500/10 text-emerald-600"},
   {icon:Smartphone,name:"GCash",desc:"Pay instantly using your GCash account. Ticket is confirmed immediately.",
    steps:["Select GCash at checkout","You will be redirected to GCash to authorize","Confirm payment in the GCash app","Return to BusPay - ticket is auto-confirmed"],
    note:"GCash payments are instant and non-reversible. Make sure your balance is sufficient.",color:"bg-blue-500/10 text-blue-600"},
