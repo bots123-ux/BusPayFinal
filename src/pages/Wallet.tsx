@@ -755,7 +755,7 @@ export default function Wallet() {
                   {/* Confirm delete row */}
                   {isConfirming && (
                     <div className="absolute inset-0 z-10 flex items-center justify-between gap-2 rounded-2xl bg-destructive/10 border border-destructive/30 px-4 animate-fade-in">
-                      <span className="text-sm font-semibold text-destructive">Delete this transaction?</span>
+                      <span className="text-sm font-semibold text-destructive"></span>
                       <div className="flex gap-2">
                         <button
                           onClick={() => setTxConfirmId(null)}
