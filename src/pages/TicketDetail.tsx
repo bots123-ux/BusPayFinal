@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ArrowRight, RotateCcw, Loader2, AlertTriangle } from "lucide-react";
-import { format } from "date-fns";
+import { ArrowLeft, ArrowRight, RotateCcw, Loader2, AlertTriangle, Clock } from "lucide-react";
+import { format, formatDistanceToNow } from "date-fns";
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatTime12h, arrivalTime, formatDuration } from "@/lib/time";
@@ -29,7 +29,14 @@ interface Detail {
   };
 }
 
-const REFUND_WINDOW_MINUTES = 60; // must match app_config in DB
+interface RefundRequest {
+  found: boolean;
+  request_id?: string;
+  status?: "pending" | "approved" | "rejected";
+  admin_note?: string | null;
+  requested_at?: string;
+  resolved_at?: string | null;
+}
 
 export default function TicketDetail() {
   const { id } = useParams();
@@ -37,48 +44,92 @@ export default function TicketDetail() {
   const { user } = useAuth();
   const { t } = useI18n();
   const [data, setData] = useState<Detail | null>(null);
+  const [refundReq, setRefundReq] = useState<RefundRequest | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refunding, setRefunding] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
   const loadTicket = async () => {
     if (!id || !user) return;
     const { data: row } = await supabase
       .from("ticket")
-      .select("id, seat_number, status, price_php, qr_code, created_at, refunded_at, refund_reason, trips(travel_date, departure_time, routes(origin, destination, duration_minutes, distance_km), buses(plate_number, model))")
+      .select(
+        "id, seat_number, status, price_php, qr_code, created_at, refunded_at, refund_reason, trips(travel_date, departure_time, routes(origin, destination, duration_minutes, distance_km), buses(plate_number, model))"
+      )
       .eq("id", id)
       .eq("user_id", user.id)
       .maybeSingle();
     setData(row as unknown as Detail);
-    setLoading(false);
   };
 
-  useEffect(() => { loadTicket(); }, [id, user]);
-
-  const minutesSinceBooking = data
-    ? (Date.now() - new Date(data.created_at).getTime()) / 60000
-    : Infinity;
-
-  const canRefund = data?.status === "paid" && minutesSinceBooking <= REFUND_WINDOW_MINUTES;
-  const minutesLeft = Math.max(0, Math.ceil(REFUND_WINDOW_MINUTES - minutesSinceBooking));
-
-  const handleRefund = async () => {
+  const loadRefundRequest = async () => {
     if (!id) return;
-    setRefunding(true);
+    const { data: req } = await supabase.rpc("get_my_refund_request", { p_ticket_id: id });
+    setRefundReq(req as RefundRequest);
+  };
+
+  useEffect(() => {
+    (async () => {
+      await Promise.all([loadTicket(), loadRefundRequest()]);
+      setLoading(false);
+    })();
+  }, [id, user]);
+
+  // Realtime: listen for refund_requests changes on this ticket
+  useEffect(() => {
+    if (!id || !user) return;
+    const ch = supabase
+      .channel(`refund-req-${id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "refund_requests",
+          filter: `ticket_id=eq.${id}`,
+        },
+        () => {
+          loadRefundRequest();
+          loadTicket();
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [id, user]);
+
+  // Departure datetime
+  const departureAt = data
+    ? new Date(`${data.trips.travel_date}T${data.trips.departure_time}`)
+    : null;
+
+  // Can refund = ticket is paid AND departure hasn't happened AND no pending/approved request
+  const beforeDeparture = departureAt ? new Date() < departureAt : false;
+  const hasActiveRequest =
+    refundReq?.found && refundReq.status !== "rejected";
+  const canRequestRefund =
+    data?.status === "paid" && beforeDeparture && !hasActiveRequest;
+
+  const handleRequestRefund = async () => {
+    if (!id) return;
+    setSubmitting(true);
     try {
-      const { data: result, error } = await supabase.rpc("refund_ticket", {
+      const { data: result, error } = await supabase.rpc("request_refund", {
         p_ticket_id: id,
         p_reason: "Passenger requested refund",
       });
       if (error) throw error;
       const res = result as { ok: boolean; reason?: string; amount_php?: number };
-      if (!res.ok) { toast.error(res.reason ?? "Refund failed"); return; }
-      toast.success(`Refunded! ₱${Number(data?.price_php).toLocaleString()} is back in your wallet.`);
+      if (!res.ok) {
+        toast.error(res.reason ?? "Request failed");
+        return;
+      }
+      toast.success("Refund request submitted! An admin will review it shortly.");
+      await loadRefundRequest();
       await loadTicket();
     } catch (err: any) {
-      toast.error(err?.message ?? "Refund failed. Please try again.");
+      toast.error(err?.message ?? "Request failed. Please try again.");
     } finally {
-      setRefunding(false);
+      setSubmitting(false);
       setShowConfirm(false);
     }
   };
@@ -139,7 +190,7 @@ export default function TicketDetail() {
           </div>
         )}
 
-        {data.status === "used" && (
+        {(data.status === "used" || data.status === "boarded") && (
           <div className="mx-6 rounded-2xl bg-white/10 border border-primary-foreground/20 p-4 text-center">
             <p className="text-sm font-bold text-primary-foreground/80">✓ Boarded — Ticket Used</p>
             <p className="text-xs text-primary-foreground/50 mt-0.5">This ticket cannot be refunded</p>
@@ -165,18 +216,48 @@ export default function TicketDetail() {
 
       {/* ── Refund Section ── */}
       {data.status === "paid" && (
-        <div className={cn(
-          "mt-5 rounded-2xl border p-4",
-          canRefund ? "border-amber-200 bg-amber-50" : "border-border bg-secondary/40"
-        )}>
-          {canRefund ? (
-            <>
-              <p className="text-sm font-semibold text-amber-800 mb-0.5">
-                Refund available · {minutesLeft} min left
+        <div className="mt-5">
+          {/* ── Pending request state ── */}
+          {refundReq?.found && refundReq.status === "pending" && (
+            <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
+              <div className="flex items-start gap-3">
+                <Loader2 className="h-5 w-5 text-blue-600 shrink-0 mt-0.5 animate-spin" />
+                <div>
+                  <p className="text-sm font-semibold text-blue-800">Refund request pending</p>
+                  <p className="text-xs text-blue-700 mt-0.5">
+                    Submitted {formatDistanceToNow(new Date(refundReq.requested_at!), { addSuffix: true })}. An admin will review your request.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Rejected request — allow re-submit if still before departure ── */}
+          {refundReq?.found && refundReq.status === "rejected" && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-4 mb-3">
+              <p className="text-sm font-semibold text-red-800">Refund request rejected</p>
+              {refundReq.admin_note && (
+                <p className="text-xs text-red-700 mt-0.5">Reason: {refundReq.admin_note}</p>
+              )}
+              <p className="text-xs text-red-600 mt-1">
+                Your ticket is still valid. You may submit a new request below if you still wish to cancel.
               </p>
+            </div>
+          )}
+
+          {/* ── Refund available ── */}
+          {canRequestRefund && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Clock className="h-4 w-4 text-amber-600" />
+                <p className="text-sm font-semibold text-amber-800">
+                  Refund available until departure
+                </p>
+              </div>
               <p className="text-xs text-amber-700 mb-4">
-                Cancel this ticket and get ₱{Number(data.price_php).toLocaleString()} back to your wallet.
-                Window closes {REFUND_WINDOW_MINUTES} min after booking.
+                You can request a refund of ₱{Number(data.price_php).toLocaleString()} any time before the{" "}
+                {departureAt && format(departureAt, "h:mm a")} departure on{" "}
+                {departureAt && format(departureAt, "MMM d")}. Refunds are reviewed by an admin — your wallet will be credited once approved.
               </p>
               {!showConfirm ? (
                 <Button
@@ -192,32 +273,42 @@ export default function TicketDetail() {
                   <div className="flex items-start gap-2 rounded-xl bg-amber-100 p-3">
                     <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
                     <p className="text-xs text-amber-800">
-                      Your ticket will be cancelled and ₱{Number(data.price_php).toLocaleString()} returned to your wallet.
-                      This cannot be undone.
+                      Your refund request of ₱{Number(data.price_php).toLocaleString()} will be sent to an admin for approval. Your ticket stays valid until the admin approves.
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="flex-1"
-                      onClick={() => setShowConfirm(false)} disabled={refunding}>
-                      Keep Ticket
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => setShowConfirm(false)}
+                      disabled={submitting}
+                    >
+                      Cancel
                     </Button>
-                    <Button size="sm"
+                    <Button
+                      size="sm"
                       className="flex-1 bg-destructive hover:bg-destructive/90 text-white"
-                      onClick={handleRefund} disabled={refunding}>
-                      {refunding ? <Loader2 className="h-4 w-4 animate-spin" /> : "Yes, Refund Me"}
+                      onClick={handleRequestRefund}
+                      disabled={submitting}
+                    >
+                      {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Submit Request"}
                     </Button>
                   </div>
                 </div>
               )}
-            </>
-          ) : (
-            <>
+            </div>
+          )}
+
+          {/* ── Window closed (departure passed) ── */}
+          {!canRequestRefund && !hasActiveRequest && beforeDeparture === false && (
+            <div className="rounded-2xl border border-border bg-secondary/40 p-4">
               <p className="text-sm font-semibold text-muted-foreground mb-0.5">Refund window closed</p>
               <p className="text-xs text-muted-foreground">
-                Refunds are only allowed within {REFUND_WINDOW_MINUTES} minutes of booking.
-                Contact support if you need further help.
+                Refunds can only be requested before the scheduled departure time.
+                Contact support if you need further assistance.
               </p>
-            </>
+            </div>
           )}
         </div>
       )}
