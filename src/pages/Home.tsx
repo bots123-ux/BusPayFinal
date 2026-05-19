@@ -23,6 +23,7 @@ interface Trip {
   id: string;
   travel_date: string;
   departure_time: string;
+  status: string;
   bus_id: string;
   buses?: { plate_number: string; model: string | null; total_seats: number };
 }
@@ -168,10 +169,9 @@ export default function Home() {
     (async () => {
       const { data } = await supabase
         .from("trips")
-        .select("id, travel_date, departure_time, bus_id, buses(plate_number, model, total_seats)")
+        .select("id, status, travel_date, departure_time, bus_id, buses(plate_number, model, total_seats)")
         .eq("route_id", routeId)
         .eq("travel_date", date)
-        .eq("status", "active")
         .order("departure_time", { ascending: true });
       setTrips((data as unknown as Trip[]) ?? []);
       setLoadingTrips(false);
@@ -285,29 +285,54 @@ export default function Home() {
           </div>
         ) : (
           <div className="space-y-3">
-            {visibleTrips.map((tr) => (
-              <button
-                key={tr.id}
-                onClick={() => navigate(`/app/book/${tr.id}`)}
-                className="group flex w-full items-center justify-between rounded-2xl border border-border bg-card p-4 transition-all hover:border-accent hover:shadow-soft"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="flex h-14 w-14 flex-col items-center justify-center rounded-xl bg-secondary">
-                    <span className="text-base font-extrabold leading-tight">{formatTime12h(tr.departure_time)}</span>
-                  </div>
-                  <div className="text-left">
-                    <div className="font-semibold">{currentRoute?.origin} → {currentRoute?.destination}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {tr.buses?.model ?? "Standard bus"} · {tr.buses?.plate_number}
+            {visibleTrips.map((tr) => {
+              const isCancelled = tr.status === "cancelled";
+              return isCancelled ? (
+                <div
+                  key={tr.id}
+                  className="flex w-full items-center justify-between rounded-2xl border border-border bg-card p-4 opacity-50 cursor-not-allowed"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-14 w-14 flex-col items-center justify-center rounded-xl bg-secondary">
+                      <span className="text-base font-extrabold leading-tight">{formatTime12h(tr.departure_time)}</span>
+                    </div>
+                    <div className="text-left">
+                      <div className="font-semibold">{currentRoute?.origin} → {currentRoute?.destination}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {tr.buses?.model ?? "Standard bus"} · {tr.buses?.plate_number}
+                      </div>
                     </div>
                   </div>
+                  <div className="text-right">
+                    <span className="inline-block rounded-full bg-destructive/15 px-3 py-1 text-xs font-bold text-destructive">
+                      Trip Cancelled
+                    </span>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <div className="font-bold text-primary">₱{Number(currentRoute?.price_php ?? 0).toLocaleString()}</div>
-                  <ArrowRight className="ml-auto mt-1 h-4 w-4 text-accent transition-transform group-hover:translate-x-1" />
-                </div>
-              </button>
-            ))}
+              ) : (
+                <button
+                  key={tr.id}
+                  onClick={() => navigate(`/app/book/${tr.id}`)}
+                  className="group flex w-full items-center justify-between rounded-2xl border border-border bg-card p-4 transition-all hover:border-accent hover:shadow-soft"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-14 w-14 flex-col items-center justify-center rounded-xl bg-secondary">
+                      <span className="text-base font-extrabold leading-tight">{formatTime12h(tr.departure_time)}</span>
+                    </div>
+                    <div className="text-left">
+                      <div className="font-semibold">{currentRoute?.origin} → {currentRoute?.destination}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {tr.buses?.model ?? "Standard bus"} · {tr.buses?.plate_number}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-bold text-primary">₱{Number(currentRoute?.price_php ?? 0).toLocaleString()}</div>
+                    <ArrowRight className="ml-auto mt-1 h-4 w-4 text-accent transition-transform group-hover:translate-x-1" />
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
       </section>
