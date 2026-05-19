@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { format } from "date-fns";
-import { ArrowRight, Ticket as TicketIcon, QrCode } from "lucide-react";
+import { ArrowRight, Ticket as TicketIcon, QrCode, MoreVertical, Trash2, X } from "lucide-react";
 import { formatTime12h } from "@/lib/time";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,7 +41,24 @@ export default function Tickets() {
   const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
   const mountedRef = useRef(true);
 
-  const load = async () => {
+  const [ticketMenuOpen, setTicketMenuOpen] = useState<string | null>(null);
+  const [ticketConfirmId, setTicketConfirmId] = useState<string | null>(null);
+
+  const deleteTicket = async (id: string) => {
+    const { error } = await supabase.from("ticket").delete().eq("id", id);
+    if (error) { console.error(error); return; }
+    setTickets((prev) => prev.filter((t) => t.id !== id));
+    setTicketConfirmId(null);
+    setTicketMenuOpen(null);
+  };
+
+  // Close menu on outside click
+  useEffect(() => {
+    if (!ticketMenuOpen) return;
+    const handler = () => setTicketMenuOpen(null);
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
+  }, [ticketMenuOpen]);
     if (!user) return;
     const { data, error } = await supabase
       .from("ticket")
@@ -143,42 +160,94 @@ export default function Tickets() {
             const destination = tr.trips?.routes?.destination ?? "—";
             const travelDate = tr.trips?.travel_date;
             const departureTime = tr.trips?.departure_time;
+            const isPast = tab === "past";
+            const isMenuOpen = ticketMenuOpen === tr.id;
+            const isConfirming = ticketConfirmId === tr.id;
 
             return (
-              <Link key={tr.id} to={`/app/tickets/${tr.id}`}
-                className="group block animate-slide-up"
-                style={{ animationDelay: `${i * 40}ms` }}>
-                <article className="overflow-hidden rounded-2xl bg-gradient-ticket text-primary-foreground shadow-navy transition-transform group-hover:-translate-y-0.5">
-                  <div className="flex items-center justify-between p-5">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wider text-accent">
-                        {travelDate
-                          ? format(new Date(travelDate + "T00:00:00"), "EEE, d MMM")
-                          : "—"
-                        }{departureTime ? ` · ${formatTime12h(departureTime)}` : ""}
-                      </p>
-                      <div className="mt-1 flex items-center gap-2 text-xl font-bold">
-                        <span>{origin}</span>
-                        <ArrowRight className="h-4 w-4 text-accent" />
-                        <span>{destination}</span>
-                      </div>
-                    </div>
-                    <QrCode className="h-8 w-8 text-accent/70" />
-                  </div>
-                  <div className="border-t border-dashed border-primary-foreground/20 px-5 py-4">
-                    <div className="flex items-center justify-between text-sm">
-                      <Field label="Seat" value={`#${tr.seat_number}`} />
+              <div key={tr.id} className="relative animate-slide-up" style={{ animationDelay: `${i * 40}ms` }}>
+                <Link to={`/app/tickets/${tr.id}`} className="group block">
+                  <article className="overflow-hidden rounded-2xl bg-gradient-ticket text-primary-foreground shadow-navy transition-transform group-hover:-translate-y-0.5">
+                    <div className="flex items-center justify-between p-5">
                       <div>
-                        <div className="text-[10px] uppercase tracking-wider text-primary-foreground/60 mb-1">Status</div>
-                        <span className={cn("rounded-full px-2 py-0.5 text-xs font-bold capitalize", STATUS_STYLE[tr.status] ?? "bg-secondary text-muted-foreground")}>
-                          {tr.status}
-                        </span>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-accent">
+                          {travelDate
+                            ? format(new Date(travelDate + "T00:00:00"), "EEE, d MMM")
+                            : "—"
+                          }{departureTime ? ` · ${formatTime12h(departureTime)}` : ""}
+                        </p>
+                        <div className="mt-1 flex items-center gap-2 text-xl font-bold">
+                          <span>{origin}</span>
+                          <ArrowRight className="h-4 w-4 text-accent" />
+                          <span>{destination}</span>
+                        </div>
                       </div>
-                      <Field label="Total" value={`₱${Number(tr.price_php).toLocaleString()}`} />
+                      <QrCode className="h-8 w-8 text-accent/70" />
+                    </div>
+                    <div className="border-t border-dashed border-primary-foreground/20 px-5 py-4">
+                      <div className="flex items-center justify-between text-sm">
+                        <Field label="Seat" value={`#${tr.seat_number}`} />
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wider text-primary-foreground/60 mb-1">Status</div>
+                          <span className={cn("rounded-full px-2 py-0.5 text-xs font-bold capitalize", STATUS_STYLE[tr.status] ?? "bg-secondary text-muted-foreground")}>
+                            {tr.status}
+                          </span>
+                        </div>
+                        <Field label="Total" value={`₱${Number(tr.price_php).toLocaleString()}`} />
+                      </div>
+                    </div>
+                  </article>
+                </Link>
+
+                {/* 3-dot menu — only on past tickets */}
+                {isPast && !isConfirming && (
+                  <button
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTicketMenuOpen(isMenuOpen ? null : tr.id); }}
+                    className="absolute right-3 top-3 z-10 rounded-full p-1.5 bg-black/30 hover:bg-black/50 transition-colors"
+                  >
+                    <MoreVertical className="h-4 w-4 text-white" />
+                  </button>
+                )}
+
+                {/* Dropdown: Delete / Cancel */}
+                {isPast && isMenuOpen && !isConfirming && (
+                  <div className="absolute right-3 top-11 z-20 flex flex-col gap-1 rounded-2xl border border-border bg-card shadow-elevated p-2 min-w-[140px] animate-fade-in">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setTicketConfirmId(tr.id); setTicketMenuOpen(null); }}
+                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-destructive hover:bg-destructive/10 transition-colors"
+                    >
+                      <Trash2 className="h-4 w-4" /> Delete
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setTicketMenuOpen(null); }}
+                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-secondary transition-colors"
+                    >
+                      <X className="h-4 w-4" /> Cancel
+                    </button>
+                  </div>
+                )}
+
+                {/* Confirm delete overlay */}
+                {isPast && isConfirming && (
+                  <div className="absolute inset-0 z-10 flex items-center justify-between gap-2 rounded-2xl bg-black/70 px-5 animate-fade-in">
+                    <span className="text-sm font-semibold text-white">Delete this ticket?</span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setTicketConfirmId(null)}
+                        className="rounded-xl border border-white/30 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => deleteTicket(tr.id)}
+                        className="rounded-xl bg-destructive px-3 py-1.5 text-xs font-bold text-white hover:bg-destructive/80 transition-colors"
+                      >
+                        Confirm Delete
+                      </button>
                     </div>
                   </div>
-                </article>
-              </Link>
+                )}
+              </div>
             );
           })}
         </div>
