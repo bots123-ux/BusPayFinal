@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { formatTime12h, arrivalTime, formatDuration } from "@/lib/time";
-import { ArrowLeft, Loader2, Wallet as WalletIcon, Smartphone, Check, CreditCard, X, ChevronRight } from "lucide-react";
+import { ArrowLeft, Loader2, Wallet as WalletIcon, Smartphone, Check, CreditCard, X, ChevronRight, ChevronLeft, Calendar } from "lucide-react";
 import { format } from "date-fns";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,6 +36,202 @@ interface PaymentMethod {
 }
 
 const BANKS = ["BDO", "BPI", "Metrobank", "UnionBank", "PNB", "Security Bank", "RCBC", "Chinabank", "Other"];
+
+// ── Mini Calendar ─────────────────────────────────────────────────────────────
+function MiniCalendar({
+  value, onChange, onClose,
+}: {
+  value: { day: number; month: number; year: number } | null;
+  onChange: (d: { day: number; month: number; year: number }) => void;
+  onClose: () => void;
+}) {
+  const today = new Date();
+  const minYear = 2026;
+  const initYear = value?.year ?? Math.max(today.getFullYear(), minYear);
+  const initMonth = value?.month ? value.month - 1 : (initYear === minYear ? 0 : today.getMonth());
+  const [viewYear, setViewYear] = useState(initYear);
+  const [viewMonth, setViewMonth] = useState(initMonth);
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const firstDow = new Date(viewYear, viewMonth, 1).getDay();
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const DAYS = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+  const prevMonth = () => {
+    if (viewMonth === 0) { if (viewYear <= minYear) return; setViewMonth(11); setViewYear(y => y - 1); }
+    else setViewMonth(m => m - 1);
+  };
+  const nextMonth = () => {
+    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); }
+    else setViewMonth(m => m + 1);
+  };
+  const isPrevDisabled = viewYear === minYear && viewMonth === 0;
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < firstDow; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  return (
+    <div className="absolute z-50 mt-1 rounded-2xl border border-border bg-card shadow-elevated p-4 w-72">
+      <div className="flex items-center justify-between mb-3">
+        <button onClick={prevMonth} disabled={isPrevDisabled}
+          className="p-1 rounded-lg hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed transition">
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <span className="font-bold text-sm">{MONTHS[viewMonth]} {viewYear}</span>
+        <button onClick={nextMonth} className="p-1 rounded-lg hover:bg-secondary transition">
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="grid grid-cols-7 mb-1">
+        {DAYS.map(d => <div key={d} className="text-center text-[10px] font-semibold text-muted-foreground py-1">{d}</div>)}
+      </div>
+      <div className="grid grid-cols-7">
+        {cells.map((day, i) => {
+          const isSelected = day !== null && value?.day === day && value?.month === viewMonth + 1 && value?.year === viewYear;
+          return (
+            <button key={i} disabled={day === null}
+              onClick={() => { if (!day) return; onChange({ day, month: viewMonth + 1, year: viewYear }); onClose(); }}
+              className={cn("h-8 w-full rounded-lg text-xs font-medium transition-all",
+                day === null && "cursor-default",
+                day !== null && !isSelected && "hover:bg-secondary",
+                isSelected && "bg-accent text-white font-bold")}>
+              {day}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Expiry Input with Calendar ─────────────────────────────────────────────────
+function ExpiryInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [showCal, setShowCal] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const parseExpiry = (v: string): { day: number; month: number; year: number } | null => {
+    const parts = v.split("/");
+    if (parts.length !== 3) return null;
+    const day = parseInt(parts[0], 10), month = parseInt(parts[1], 10), year = parseInt(parts[2], 10);
+    if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
+    return { day, month, year };
+  };
+  const handleRaw = (raw: string) => {
+    const digits = raw.replace(/\D/g, "").slice(0, 8);
+    let result = digits;
+    if (digits.length >= 3 && digits.length < 5) result = digits.slice(0, 2) + "/" + digits.slice(2);
+    else if (digits.length >= 5) result = digits.slice(0, 2) + "/" + digits.slice(2, 4) + "/" + digits.slice(4);
+    onChange(result);
+  };
+  const handleCalSelect = (d: { day: number; month: number; year: number }) => {
+    const dd = String(d.day).padStart(2, "0");
+    const mm = String(d.month).padStart(2, "0");
+    onChange(`${dd}/${mm}/${d.year}`);
+  };
+  useEffect(() => {
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setShowCal(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+  return (
+    <div ref={ref} className="relative">
+      <div className="relative">
+        <Input placeholder="DD/MM/YYYY" value={value} onChange={e => handleRaw(e.target.value)}
+          className="h-12 rounded-xl pr-10" maxLength={10} inputMode="numeric"
+          onKeyDown={e => { if (!/[\d/\b]/.test(e.key) && !e.ctrlKey && !e.metaKey && e.key.length === 1) e.preventDefault(); }} />
+        <button type="button" onClick={() => setShowCal(v => !v)}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary transition-colors">
+          <Calendar className="h-4 w-4" />
+        </button>
+      </div>
+      {showCal && <MiniCalendar value={parseExpiry(value)} onChange={handleCalSelect} onClose={() => setShowCal(false)} />}
+    </div>
+  );
+}
+
+// ── GCash Form ─────────────────────────────────────────────────────────────────
+function GCashForm({ gcashNumber, setGcashNumber, gcashName, setGcashName, onSave, onBack }: {
+  gcashNumber: string; setGcashNumber: (v: string) => void;
+  gcashName: string; setGcashName: (v: string) => void;
+  onSave: () => void; onBack: () => void;
+}) {
+  const formatGcashDisplay = (digits: string) => {
+    const d = digits.replace(/\D/g, "").slice(0, 10);
+    if (d.length <= 3) return d;
+    if (d.length <= 6) return d.slice(0, 3) + " " + d.slice(3);
+    return d.slice(0, 3) + " " + d.slice(3, 6) + " " + d.slice(6);
+  };
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl bg-blue-500/5 border border-blue-200 p-3 text-xs text-blue-700">
+        Demo only — no real GCash transaction will occur.
+      </div>
+      <div className="space-y-1.5">
+        <Label>GCash Mobile Number <span className="text-destructive">*</span></Label>
+        <div className="flex">
+          <span className="inline-flex h-12 items-center rounded-l-xl border border-r-0 border-input bg-secondary px-3 text-sm font-semibold text-muted-foreground select-none">+63</span>
+          <Input placeholder="917 123 4567" inputMode="numeric"
+            className="h-12 rounded-l-none rounded-r-xl flex-1 font-mono tracking-wider" maxLength={12}
+            value={gcashNumber.startsWith("+63") ? formatGcashDisplay(gcashNumber.slice(3)) : formatGcashDisplay(gcashNumber)}
+            onChange={e => { const digits = e.target.value.replace(/\D/g, "").slice(0, 10); setGcashNumber("+63" + digits); }} />
+        </div>
+        <p className="text-xs text-muted-foreground">Enter your 10-digit GCash number</p>
+      </div>
+      <div className="space-y-1.5">
+        <Label>GCash Account Name <span className="text-destructive">*</span></Label>
+        <Input placeholder="Juan Dela Cruz" value={gcashName}
+          onChange={e => setGcashName(e.target.value)} className="h-12 rounded-xl" maxLength={80} />
+      </div>
+      <Button variant="navy" size="lg" className="w-full" onClick={onSave}>Save & Pay</Button>
+      <button onClick={onBack} className="w-full text-center text-sm text-muted-foreground hover:text-foreground">← Back</button>
+    </div>
+  );
+}
+
+// ── Card Form ─────────────────────────────────────────────────────────────────
+function CardForm({ cardHolder, setCardHolder, cardNumber, setCardNumber, cardExpiry, setCardExpiry, bankName, setBankName, onSave, onBack }: {
+  cardHolder: string; setCardHolder: (v: string) => void;
+  cardNumber: string; setCardNumber: (v: string) => void;
+  cardExpiry: string; setCardExpiry: (v: string) => void;
+  bankName: string; setBankName: (v: string) => void;
+  onSave: () => void; onBack: () => void;
+}) {
+  const formatCardNum = (v: string) => v.replace(/\D/g, "").slice(0, 16).replace(/(.{4})/g, "$1 ").trim();
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl bg-purple-500/5 border border-purple-200 p-3 text-xs text-purple-700">
+        Demo only — your card will not be charged. Only last 4 digits are saved.
+      </div>
+      <div className="space-y-1.5">
+        <Label>Bank</Label>
+        <div className="grid grid-cols-3 gap-2">
+          {BANKS.map(b => (
+            <button key={b} onClick={() => setBankName(b)}
+              className={cn("rounded-xl border-2 py-2 text-xs font-semibold transition-all",
+                bankName === b ? "border-accent bg-accent/10 text-primary" : "border-border hover:border-accent/40")}>
+              {b}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <Label>Cardholder Name <span className="text-destructive">*</span></Label>
+        <Input placeholder="JUAN DELA CRUZ" value={cardHolder}
+          onChange={e => setCardHolder(e.target.value.toUpperCase())} className="h-12 rounded-xl" maxLength={60} />
+      </div>
+      <div className="space-y-1.5">
+        <Label>Card Number <span className="text-destructive">*</span></Label>
+        <Input placeholder="0000 0000 0000 0000" value={cardNumber}
+          onChange={e => setCardNumber(formatCardNum(e.target.value))}
+          className="h-12 rounded-xl font-mono tracking-widest" maxLength={19} inputMode="numeric"
+          onKeyDown={e => { if (!/[\d\s\b]/.test(e.key) && !e.ctrlKey && !e.metaKey && e.key.length === 1) e.preventDefault(); }} />
+      </div>
+      <div className="space-y-1.5">
+        <Label>Expiry Date <span className="text-destructive">*</span></Label>
+        <ExpiryInput value={cardExpiry} onChange={setCardExpiry} />
+        <p className="text-xs text-muted-foreground">Format: DD/MM/YYYY · Must be 2026 or later</p>
+      </div>
+      <Button variant="navy" size="lg" className="w-full" onClick={onSave}>Save & Pay</Button>
+      <button onClick={onBack} className="w-full text-center text-sm text-muted-foreground hover:text-foreground">← Back</button>
+    </div>
+  );
+}
 
 const SEAT_LAYOUT = (() => {
   const rows: { row: number; left: number[]; right: number[] }[] = [];
@@ -150,7 +346,9 @@ export default function Booking() {
       const expiry = cardExpiry.trim();
       if (holder.length < 2) { toast.error("Enter cardholder name"); return; }
       if (!/^\d{16}$/.test(raw)) { toast.error("Enter a valid 16-digit card number"); return; }
-      if (!/^\d{2}\/\d{2}$/.test(expiry)) { toast.error("Enter expiry as MM/YY"); return; }
+      if (!/^\d{2}\/\d{2}\/\d{4}$/.test(expiry)) { toast.error("Enter expiry as DD/MM/YYYY (e.g. 31/12/2028)"); return; }
+      const [dd, mm, yyyy] = expiry.split("/").map(Number);
+      if (dd < 1 || dd > 31 || mm < 1 || mm > 12 || yyyy < 2026) { toast.error("Enter a valid expiry (DD/MM/YYYY, year 2026 or later)"); return; }
       const { error } = await supabase.from("payment_methods").upsert(
         { user_id: user.id, type: "card", card_holder: holder, card_last4: raw.slice(-4), card_expiry: expiry, bank_name: bankName },
         { onConflict: "user_id,type" }
@@ -202,9 +400,6 @@ export default function Booking() {
       setSubmitting(false);
     }
   };
-
-  const formatCardNum = (v: string) => v.replace(/\D/g, "").slice(0, 16).replace(/(.{4})/g, "$1 ").trim();
-  const formatExpiry = (v: string) => { const d = v.replace(/\D/g, "").slice(0, 4); return d.length >= 3 ? d.slice(0, 2) + "/" + d.slice(2) : d; };
 
   if (loading || !trip) return <div className="px-5 py-6"><CardSkeleton /></div>;
 
@@ -325,62 +520,28 @@ export default function Booking() {
           <p className="mb-5 text-sm text-muted-foreground">Save your details to complete payment.</p>
 
           {method === "gcash" ? (
-            <div className="space-y-4">
-              <div className="rounded-2xl bg-blue-500/5 border border-blue-200 p-3 text-xs text-blue-700">
-                Demo only — no real GCash transaction will occur.
-              </div>
-              <div className="space-y-1.5">
-                <Label>GCash Mobile Number</Label>
-                <Input placeholder="+63917xxxxxxx" value={gcashNumber}
-                  onChange={(e) => setGcashNumber(e.target.value)} className="h-12 rounded-xl" maxLength={13} />
-                <p className="text-xs text-muted-foreground">Format: +63 followed by 10 digits</p>
-              </div>
-              <div className="space-y-1.5">
-                <Label>GCash Account Name</Label>
-                <Input placeholder="Juan Dela Cruz" value={gcashName}
-                  onChange={(e) => setGcashName(e.target.value)} className="h-12 rounded-xl" maxLength={80} />
-              </div>
-            </div>
+            <GCashForm
+              gcashNumber={gcashNumber}
+              setGcashNumber={setGcashNumber}
+              gcashName={gcashName}
+              setGcashName={setGcashName}
+              onSave={savePmAndConfirm}
+              onBack={() => setStep("pay")}
+            />
           ) : (
-            <div className="space-y-4">
-              <div className="rounded-2xl bg-purple-500/5 border border-purple-200 p-3 text-xs text-purple-700">
-                Demo only — your card will not be charged. Only last 4 digits are saved.
-              </div>
-              <div className="space-y-1.5">
-                <Label>Bank</Label>
-                <div className="grid grid-cols-3 gap-2">
-                  {BANKS.map((b) => (
-                    <button key={b} onClick={() => setBankName(b)}
-                      className={cn("rounded-xl border-2 py-2 text-xs font-semibold transition-all",
-                        bankName === b ? "border-accent bg-accent/10 text-primary" : "border-border hover:border-accent/40")}>
-                      {b}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Cardholder Name</Label>
-                <Input placeholder="JUAN DELA CRUZ" value={cardHolder}
-                  onChange={(e) => setCardHolder(e.target.value.toUpperCase())} className="h-12 rounded-xl" maxLength={60} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Card Number</Label>
-                <Input placeholder="0000 0000 0000 0000" value={cardNumber}
-                  onChange={(e) => setCardNumber(formatCardNum(e.target.value))}
-                  className="h-12 rounded-xl font-mono tracking-widest" maxLength={19} inputMode="numeric" />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Expiry Date</Label>
-                <Input placeholder="MM/YY" value={cardExpiry}
-                  onChange={(e) => setCardExpiry(formatExpiry(e.target.value))}
-                  className="h-12 rounded-xl" maxLength={5} inputMode="numeric" />
-              </div>
-            </div>
+            <CardForm
+              cardHolder={cardHolder}
+              setCardHolder={setCardHolder}
+              cardNumber={cardNumber}
+              setCardNumber={setCardNumber}
+              cardExpiry={cardExpiry}
+              setCardExpiry={setCardExpiry}
+              bankName={bankName}
+              setBankName={setBankName}
+              onSave={savePmAndConfirm}
+              onBack={() => setStep("pay")}
+            />
           )}
-
-          <Button variant="navy" size="lg" className="mt-6 w-full" disabled={submitting} onClick={savePmAndConfirm}>
-            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save & Pay"}
-          </Button>
         </div>
       )}
 
