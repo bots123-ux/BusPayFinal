@@ -280,9 +280,10 @@ export default function Booking() {
     (async () => {
       const { data: tripData, error } = await supabase
         .from("trips")
-        .select("id, travel_date, departure_time, bus_id, buses(plate_number, model, total_seats), routes(origin, destination, price_php, duration_minutes)")
+        .select("id, status, travel_date, departure_time, bus_id, buses(plate_number, model, total_seats), routes(origin, destination, price_php, duration_minutes)")
         .eq("id", tripId).maybeSingle();
       if (error || !tripData) { toast.error("Trip not found"); navigate("/app"); return; }
+      if ((tripData as any).status === "cancelled") { toast.error("Trip cancelled"); navigate("/app"); return; }
       if (cancelled) return;
       setTrip(tripData as unknown as TripDetail);
       await refreshOccupiedSeats(tripId);

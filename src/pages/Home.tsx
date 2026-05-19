@@ -171,6 +171,7 @@ export default function Home() {
         .select("id, travel_date, departure_time, bus_id, buses(plate_number, model, total_seats)")
         .eq("route_id", routeId)
         .eq("travel_date", date)
+        .eq("status", "active")
         .order("departure_time", { ascending: true });
       setTrips((data as unknown as Trip[]) ?? []);
       setLoadingTrips(false);
