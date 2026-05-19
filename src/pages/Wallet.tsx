@@ -727,7 +727,7 @@ export default function Wallet() {
                   {/* 3-dot button */}
                   {!isConfirming && (
                     <button
-                      onClick={() => setTxMenuOpen(isMenuOpen ? null : tx.id)}
+                      onClick={(e) => { e.stopPropagation(); setTxMenuOpen(isMenuOpen ? null : tx.id); }}
                       className="shrink-0 rounded-full p-1 hover:bg-secondary transition-colors"
                     >
                       <MoreVertical className="h-4 w-4 text-muted-foreground" />
@@ -738,13 +738,13 @@ export default function Wallet() {
                   {isMenuOpen && !isConfirming && (
                     <div className="absolute right-2 top-12 z-20 flex flex-col gap-1 rounded-2xl border border-border bg-card shadow-elevated p-2 min-w-[140px] animate-fade-in">
                       <button
-                        onClick={() => { setTxConfirmId(tx.id); setTxMenuOpen(null); }}
+                        onClick={(e) => { e.stopPropagation(); setTxConfirmId(tx.id); setTxMenuOpen(null); }}
                         className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-destructive hover:bg-destructive/10 transition-colors"
                       >
                         <Trash2 className="h-4 w-4" /> Delete
                       </button>
                       <button
-                        onClick={() => setTxMenuOpen(null)}
+                        onClick={(e) => { e.stopPropagation(); setTxMenuOpen(null); }}
                         className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-secondary transition-colors"
                       >
                         <X className="h-4 w-4" /> Cancel
