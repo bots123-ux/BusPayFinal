@@ -26,12 +26,12 @@ export function BottomNav({ unreadCount = 0, ticketCount = 0 }: BottomNavProps) 
           <li key={to} className="flex-1">
             <NavLink to={to} end={end}
               className={({ isActive }) =>
-                cn("relative flex flex-col items-center justify-center gap-1 px-2 py-3 text-xs font-medium transition-colors",
+                cn("relative flex flex-col items-center justify-center gap-1 px-2 py-3 text-xs font-medium transition-colors duration-200 ease-out",
                   isActive ? "text-primary" : "text-muted-foreground hover:text-foreground")
               }>
               {({ isActive }) => (
                 <>
-                  <div className={cn("relative flex h-9 w-12 items-center justify-center rounded-xl transition-all",
+                  <div className={cn("relative flex h-9 w-12 items-center justify-center rounded-xl transition-[background-color,transform] duration-200 ease-out will-change-transform",
                     isActive && "bg-accent/20 text-primary")}>
                     <Icon className="h-5 w-5" />
                     {badge > 0 && (

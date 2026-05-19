@@ -74,8 +74,11 @@
     --shadow-navy: 0 12px 32px -12px hsl(222 60% 22% / 0.45);
 
     /* Motion */
-    --transition-smooth: 250ms cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-bounce: 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    --transition-smooth: 280ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-fast: 180ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    --transition-press: 120ms cubic-bezier(0.4, 0, 1, 1);
+    --transition-release: 220ms cubic-bezier(0, 0, 0.2, 1);
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -120,12 +123,30 @@
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Remove 300ms tap delay on mobile for all elements */
+    touch-action: manipulation;
   }
 
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', system-ui, sans-serif;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    /* Prevent text selection flicker on rapid taps */
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Re-enable text selection for actual content */
+  p, span, h1, h2, h3, h4, h5, h6, input, textarea, [contenteditable] {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  /* Smooth all interactive elements — override per-component as needed */
+  button, a, [role="button"], [role="tab"], [role="menuitem"] {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    outline-offset: 2px;
   }
 
   h1, h2, h3, h4 {
@@ -148,36 +169,36 @@
 
 @layer utilities {
   .animate-fade-in {
-    animation: fade-in 0.5s ease-out;
+    animation: fade-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
   }
   .animate-slide-up {
-    animation: slide-up 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    animation: slide-up 0.38s cubic-bezier(0.4, 0, 0.2, 1) both;
   }
   .animate-scale-in {
-    animation: scale-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    animation: scale-in 0.25s cubic-bezier(0.4, 0, 0.2, 1) both;
   }
   .animate-shimmer {
     background: linear-gradient(90deg, hsl(var(--muted)) 0%, hsl(var(--secondary)) 50%, hsl(var(--muted)) 100%);
     background-size: 200% 100%;
     animation: shimmer 1.6s ease-in-out infinite;
   }
+  /* Prevents layout thrash during repeated press animations */
+  .will-change-transform {
+    will-change: transform;
+  }
 }
 
 @keyframes fade-in {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 @keyframes slide-up {
-  from { opacity: 0; transform: translateY(20px); }
+  from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: translateY(0); }
 }
 @keyframes scale-in {
-  from { opacity: 0; transform: scale(0.95); }
+  from { opacity: 0; transform: scale(0.92); }
   to { opacity: 1; transform: scale(1); }
-}
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
 }
 
 /* Hide browser native password reveal button */
@@ -186,4 +207,9 @@ input[type="password"]::-ms-clear,
 input[type="password"]::-webkit-credentials-auto-fill-button,
 input[type="password"]::-webkit-strong-password-auto-fill-button {
   display: none !important;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
