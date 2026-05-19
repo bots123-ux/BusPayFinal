@@ -59,6 +59,8 @@ export default function Tickets() {
     document.addEventListener("click", handler);
     return () => document.removeEventListener("click", handler);
   }, [ticketMenuOpen]);
+
+  const load = async () => {
     if (!user) return;
     const { data, error } = await supabase
       .from("ticket")
