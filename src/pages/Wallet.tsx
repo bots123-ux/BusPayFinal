@@ -411,6 +411,8 @@ export default function Wallet() {
     setTxMenuOpen(null);
     toast.success("Transaction deleted");
   };
+
+  const load = async () => {
     if (!user) return;
     const [{ data: w }, { data: txData }, { data: pmData }] = await Promise.all([
       supabase.from("wallet").select("balance_php").eq("user_id", user.id).maybeSingle(),
