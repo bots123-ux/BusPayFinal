@@ -376,6 +376,8 @@ export default function Booking() {
           .select("id").single();
         if (tErr) throw tErr;
         await supabase.from("ticket").update({ qr_code: `BUSPAY:${ticketRow.id}` }).eq("id", ticketRow.id);
+        // confirm_ticket_payment handles wallet deduction atomically for wallet payments.
+        // Do NOT call deduct_wallet separately — that would cause a double charge.
         const { data: confirmed, error: cErr } = await supabase.rpc("confirm_ticket_payment", {
           p_ticket_id: ticketRow.id, p_payment_method: method === "card" ? "gcash" : method, p_amount: price,
         });
@@ -384,12 +386,6 @@ export default function Booking() {
         ticketIds.push(ticketRow.id);
       }
       if (method === "wallet") {
-        const { data: deducted, error: dErr } = await supabase.rpc("deduct_wallet", {
-          p_user_id: user.id, p_amount: totalPrice,
-          p_description: `${selectedSeats.length} ticket(s) · ${trip.routes.origin} → ${trip.routes.destination}`,
-        });
-        if (dErr) throw dErr;
-        if (!deducted) { toast.error("Insufficient wallet balance."); return; }
         setWalletBalance((b) => b - totalPrice);
       }
       setConfirmedTicketId(ticketIds[0]);

@@ -392,7 +392,7 @@ export type Database = {
       notification_type: "booking" | "payment" | "reminder" | "system"
       payment_method: "cash" | "gcash" | "wallet" | "card"
       payment_status: "pending" | "completed" | "failed" | "refunded"
-      ticket_status: "pending" | "paid" | "cancelled" | "used" | "expired"
+      ticket_status: "pending" | "paid" | "cancelled" | "used" | "expired" | "boarded"
       wallet_tx_type: "topup" | "payment" | "refund"
     }
     CompositeTypes: {
@@ -524,7 +524,7 @@ export const Constants = {
       notification_type: ["booking", "payment", "reminder", "system"],
       payment_method: ["cash", "gcash", "wallet", "card"],
       payment_status: ["pending", "completed", "failed", "refunded"],
-      ticket_status: ["pending", "paid", "cancelled", "used", "expired"],
+      ticket_status: ["pending", "paid", "cancelled", "used", "expired", "boarded"],
       wallet_tx_type: ["topup", "payment", "refund"],
     },
   },
