@@ -39,6 +39,7 @@ function friendlyError(msg: string): string {
   if (msg.includes("Invalid login credentials")) return "Incorrect password. Please try again.";
   if (msg.includes("User already registered")) return "This email is already registered. Try signing in instead.";
   if (msg.includes("Password should be")) return "Incorrect password. Please try again.";
+  if (msg.includes("No account found")) return "No account found with this email address.";
   return msg;
 }
 
@@ -81,6 +82,16 @@ export default function Auth() {
     if (!emailSchema.safeParse(cleanEmail).success) { toast.error("Please enter a valid email."); return; }
     setSubmitting(true);
     try {
+      // Step 1: Check if account exists via Edge Function
+      const res = await supabase.functions.invoke("check-email", {
+        body: { email: cleanEmail },
+      });
+      if (res.error) throw res.error;
+      if (!res.data?.exists) {
+        toast.error("No account found with this email address.");
+        return;
+      }
+      // Step 2: Account exists — send reset email
       const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, { redirectTo: `${window.location.origin}/auth?mode=reset` });
       if (error) throw error;
       setForgotSent(true);
