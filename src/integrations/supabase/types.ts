@@ -98,8 +98,12 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
+          is_admin: boolean | null
+          is_driver: boolean | null
           language: string
           phone: string | null
+          refund_count_30d: number
+          refund_window_start: string | null
           updated_at: string
           user_id: string
         }
@@ -108,8 +112,12 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          is_admin?: boolean | null
+          is_driver?: boolean | null
           language?: string
           phone?: string | null
+          refund_count_30d?: number
+          refund_window_start?: string | null
           updated_at?: string
           user_id: string
         }
@@ -118,8 +126,12 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          is_admin?: boolean | null
+          is_driver?: boolean | null
           language?: string
           phone?: string | null
+          refund_count_30d?: number
+          refund_window_start?: string | null
           updated_at?: string
           user_id?: string
         }

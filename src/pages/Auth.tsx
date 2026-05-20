@@ -138,8 +138,26 @@ export default function Auth() {
         toast.success("Account created! Please sign in.");
         setMode("signin"); setPassword("");
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
+        const { data: signInData, error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
         if (error) { const r = recordFailedAttempt(cleanEmail); if (r.locked) setLockMs(r.remainingMs); throw error; }
+        // Check if this account is a driver or admin — they should use their own apps
+        const { data: passengerRow } = await supabase
+          .from("passenger")
+          .select("is_driver, is_admin")
+          .eq("user_id", signInData.user!.id)
+          .single();
+        if (passengerRow?.is_driver) {
+          await supabase.auth.signOut();
+          toast.error("Driver accounts must use the QR Reader app to sign in.");
+          setSubmitting(false);
+          return;
+        }
+        if (passengerRow?.is_admin) {
+          await supabase.auth.signOut();
+          toast.error("Admin accounts must use the Admin panel to sign in.");
+          setSubmitting(false);
+          return;
+        }
         clearAttempts(cleanEmail); navigate(redirectTo, { replace: true });
       }
     } catch (err: any) { toast.error(friendlyError(err?.message)); }
