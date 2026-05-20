@@ -105,7 +105,7 @@ export default function Auth() {
     finally { setSubmitting(false); }
   };
 
-
+  const handleEmailSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (isLocked) return;
     const cleanEmail = sanitizeEmail(email);
@@ -260,7 +260,7 @@ export default function Auth() {
     </main>
   );
 
-
+  return (
     <main className="min-h-screen bg-background">
       <div className="mx-auto flex min-h-screen max-w-md flex-col px-6 py-8">
         <header className="mb-8 animate-fade-in"><Logo /></header>
@@ -284,111 +284,109 @@ export default function Auth() {
               </div>
             </div>
           )}
-          {true && (
-            <form onSubmit={handleEmailSubmit} className="space-y-4">
-              {mode === "signup" && (
-                <div className="space-y-1.5">
-                  <Label htmlFor="name">{t("auth.fullName")} <span className="text-destructive">*</span></Label>
-                  <div className="relative">
-                    <UserIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input id="name" autoComplete="name" value={fullName} onChange={(e) => setFullName(e.target.value)}
-                      maxLength={80} required className="h-12 rounded-xl pl-10" placeholder="Juan Dela Cruz" />
-                  </div>
-                </div>
-              )}
+          <form onSubmit={handleEmailSubmit} className="space-y-4">
+            {mode === "signup" && (
               <div className="space-y-1.5">
-                <Label htmlFor="email">{t("auth.email")} <span className="text-destructive">*</span></Label>
+                <Label htmlFor="name">{t("auth.fullName")} <span className="text-destructive">*</span></Label>
                 <div className="relative">
-                  <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input id="email" type="email" autoComplete="email" value={email}
-                    onChange={(e) => setEmail(e.target.value)} maxLength={254} required className="h-12 rounded-xl pl-10" placeholder="you@example.com" />
+                  <UserIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input id="name" autoComplete="name" value={fullName} onChange={(e) => setFullName(e.target.value)}
+                    maxLength={80} required className="h-12 rounded-xl pl-10" placeholder="Juan Dela Cruz" />
                 </div>
               </div>
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">{t("auth.password")} <span className="text-destructive">*</span></Label>
-                  {mode === "signin" && (
-                    <button type="button" onClick={() => setMode("forgot")} className="text-xs font-semibold text-primary hover:underline">
-                      Forgot password?
-                    </button>
-                  )}
+            )}
+            <div className="space-y-1.5">
+              <Label htmlFor="email">{t("auth.email")} <span className="text-destructive">*</span></Label>
+              <div className="relative">
+                <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input id="email" type="email" autoComplete="email" value={email}
+                  onChange={(e) => setEmail(e.target.value)} maxLength={254} required className="h-12 rounded-xl pl-10" placeholder="you@example.com" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">{t("auth.password")} <span className="text-destructive">*</span></Label>
+                {mode === "signin" && (
+                  <button type="button" onClick={() => setMode("forgot")} className="text-xs font-semibold text-primary hover:underline">
+                    Forgot password?
+                  </button>
+                )}
+              </div>
+              <div className="relative">
+                <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input id="password" type={showPassword ? "text" : "password"}
+                  autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                  value={password} onChange={(e) => setPassword(e.target.value)}
+                  maxLength={128} required className="h-12 rounded-xl pl-10 pr-10" placeholder="••••••••" style={{WebkitAppearance:"none"}} />
+                <button type="button"
+                  onMouseDown={(e) => { e.preventDefault(); setShowPassword(p => !p); }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none">
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {mode === "signup" && (
+                <div className="mt-2 rounded-xl border border-border bg-muted/40 p-3 space-y-1.5">
+                  <p className="text-xs font-semibold text-foreground mb-1">Password Requirements:</p>
+                  {[
+                    { label: "At least 8 characters", met: password.length >= 8 },
+                    { label: "One uppercase letter (A-Z)", met: /[A-Z]/.test(password) },
+                    { label: "One lowercase letter (a-z)", met: /[a-z]/.test(password) },
+                    { label: "One number (0-9)", met: /[0-9]/.test(password) },
+                    { label: "One special character (!@#$%^&*…)", met: /[^a-zA-Z0-9]/.test(password) },
+                  ].map(({ label, met }) => (
+                    <div key={label} className="flex items-center gap-2">
+                      <span className={cn(
+                        "flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full text-[10px]",
+                        met ? "text-emerald-500" : "text-muted-foreground"
+                      )}>
+                        {met ? (
+                          <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="8" cy="8" r="7.5" stroke="currentColor"/>
+                            <path d="M5 8l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        ) : (
+                          <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="8" cy="8" r="7.5" stroke="currentColor"/>
+                            <path d="M6 6l4 4M10 6l-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                          </svg>
+                        )}
+                      </span>
+                      <span className={cn(
+                        "text-xs",
+                        met ? "text-emerald-500 font-medium" : "text-muted-foreground"
+                      )}>{label}</span>
+                    </div>
+                  ))}
                 </div>
+              )}
+              {mode === "signin" && !isLocked && attemptsRemaining(email) < 5 && attemptsRemaining(email) > 0 && (
+                <p className="text-xs text-destructive">⚠ {attemptsRemaining(email)} attempt{attemptsRemaining(email) === 1 ? "" : "s"} remaining — too many failures will lock this account.</p>
+              )}
+            </div>
+            {mode === "signup" && (
+              <div className="space-y-1.5">
+                <Label htmlFor="confirmPassword">Confirm Password <span className="text-destructive">*</span></Label>
                 <div className="relative">
                   <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input id="password" type={showPassword ? "text" : "password"}
-                    autoComplete={mode === "signup" ? "new-password" : "current-password"}
-                    value={password} onChange={(e) => setPassword(e.target.value)}
+                  <Input id="confirmPassword" type={showConfirmPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
                     maxLength={128} required className="h-12 rounded-xl pl-10 pr-10" placeholder="••••••••" style={{WebkitAppearance:"none"}} />
                   <button type="button"
-                    onMouseDown={(e) => { e.preventDefault(); setShowPassword(p => !p); }}
+                    onMouseDown={(e) => { e.preventDefault(); setShowConfirmPassword(p => !p); }}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none">
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
-                {mode === "signup" && (
-                  <div className="mt-2 rounded-xl border border-border bg-muted/40 p-3 space-y-1.5">
-                    <p className="text-xs font-semibold text-foreground mb-1">Password Requirements:</p>
-                    {[
-                      { label: "At least 8 characters", met: password.length >= 8 },
-                      { label: "One uppercase letter (A-Z)", met: /[A-Z]/.test(password) },
-                      { label: "One lowercase letter (a-z)", met: /[a-z]/.test(password) },
-                      { label: "One number (0-9)", met: /[0-9]/.test(password) },
-                      { label: "One special character (!@#$%^&*…)", met: /[^a-zA-Z0-9]/.test(password) },
-                    ].map(({ label, met }) => (
-                      <div key={label} className="flex items-center gap-2">
-                        <span className={cn(
-                          "flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full text-[10px]",
-                          met ? "text-emerald-500" : "text-muted-foreground"
-                        )}>
-                          {met ? (
-                            <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" xmlns="http://www.w3.org/2000/svg">
-                              <circle cx="8" cy="8" r="7.5" stroke="currentColor"/>
-                              <path d="M5 8l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                          ) : (
-                            <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" xmlns="http://www.w3.org/2000/svg">
-                              <circle cx="8" cy="8" r="7.5" stroke="currentColor"/>
-                              <path d="M6 6l4 4M10 6l-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                            </svg>
-                          )}
-                        </span>
-                        <span className={cn(
-                          "text-xs",
-                          met ? "text-emerald-500 font-medium" : "text-muted-foreground"
-                        )}>{label}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {mode === "signin" && !isLocked && attemptsRemaining(email) < 5 && attemptsRemaining(email) > 0 && (
-                  <p className="text-xs text-destructive">⚠ {attemptsRemaining(email)} attempt{attemptsRemaining(email) === 1 ? "" : "s"} remaining — too many failures will lock this account.</p>
+                {confirmPassword && password !== confirmPassword && (
+                  <p className="text-xs text-destructive">Passwords do not match.</p>
                 )}
               </div>
-              {mode === "signup" && (
-                <div className="space-y-1.5">
-                  <Label htmlFor="confirmPassword">Confirm Password <span className="text-destructive">*</span></Label>
-                  <div className="relative">
-                    <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input id="confirmPassword" type={showConfirmPassword ? "text" : "password"}
-                      autoComplete="new-password"
-                      value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
-                      maxLength={128} required className="h-12 rounded-xl pl-10 pr-10" placeholder="••••••••" style={{WebkitAppearance:"none"}} />
-                    <button type="button"
-                      onMouseDown={(e) => { e.preventDefault(); setShowConfirmPassword(p => !p); }}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none">
-                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                  {confirmPassword && password !== confirmPassword && (
-                    <p className="text-xs text-destructive">Passwords do not match.</p>
-                  )}
-                </div>
-              )}
-              <Button type="submit" variant="navy" size="lg" className="w-full" disabled={submitting || isLocked}>
-                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : mode === "signin" ? t("auth.signIn") : t("auth.signUp")}
-              </Button>
-            </form>
-          )}
+            )}
+            <Button type="submit" variant="navy" size="lg" className="w-full" disabled={submitting || isLocked}>
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : mode === "signin" ? t("auth.signIn") : t("auth.signUp")}
+            </Button>
+          </form>
           <div className="my-6 flex items-center gap-3">
             <div className="h-px flex-1 bg-border" />
             <span className="text-xs uppercase tracking-wider text-muted-foreground">{t("auth.or")}</span>
