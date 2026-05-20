@@ -228,8 +228,40 @@ export default function Auth() {
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
-                {mode === "signup" && (
-                  <p className="text-xs text-muted-foreground">Must contain uppercase, lowercase, and a special character.</p>
+                {mode === "signup" && password.length > 0 && (
+                  <div className="mt-2 rounded-xl border border-border bg-muted/40 p-3 space-y-1.5">
+                    <p className="text-xs font-semibold text-foreground mb-1">Password Requirements:</p>
+                    {[
+                      { label: "At least 8 characters", met: password.length >= 8 },
+                      { label: "One uppercase letter (A-Z)", met: /[A-Z]/.test(password) },
+                      { label: "One lowercase letter (a-z)", met: /[a-z]/.test(password) },
+                      { label: "One number (0-9)", met: /[0-9]/.test(password) },
+                      { label: "One special character (!@#$%^&*…)", met: /[^a-zA-Z0-9]/.test(password) },
+                    ].map(({ label, met }) => (
+                      <div key={label} className="flex items-center gap-2">
+                        <span className={cn(
+                          "flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full text-[10px]",
+                          met ? "text-emerald-500" : "text-muted-foreground"
+                        )}>
+                          {met ? (
+                            <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" xmlns="http://www.w3.org/2000/svg">
+                              <circle cx="8" cy="8" r="7.5" stroke="currentColor"/>
+                              <path d="M5 8l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          ) : (
+                            <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" xmlns="http://www.w3.org/2000/svg">
+                              <circle cx="8" cy="8" r="7.5" stroke="currentColor"/>
+                              <path d="M6 6l4 4M10 6l-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                            </svg>
+                          )}
+                        </span>
+                        <span className={cn(
+                          "text-xs",
+                          met ? "text-emerald-500 font-medium" : "text-muted-foreground"
+                        )}>{label}</span>
+                      </div>
+                    ))}
+                  </div>
                 )}
                 {mode === "signin" && !isLocked && attemptsRemaining(email) < 5 && attemptsRemaining(email) > 0 && (
                   <p className="text-xs text-destructive">⚠ {attemptsRemaining(email)} attempt{attemptsRemaining(email) === 1 ? "" : "s"} remaining — too many failures will lock this account.</p>
