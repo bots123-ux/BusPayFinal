@@ -140,19 +140,25 @@ export default function Auth() {
       } else {
         const { data: signInData, error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
         if (error) { const r = recordFailedAttempt(cleanEmail); if (r.locked) setLockMs(r.remainingMs); throw error; }
-        // Check if this account is a driver or admin — they should use their own apps
-        const { data: passengerRow } = await supabase
-          .from("passenger")
-          .select("is_driver, is_admin")
+        // Check if this account is a driver — drivers must use the QR Reader app
+        const { data: driverRow } = await supabase
+          .from("driver_accounts")
+          .select("user_id")
           .eq("user_id", signInData.user!.id)
-          .single();
-        if (passengerRow?.is_driver) {
+          .maybeSingle();
+        if (driverRow) {
           await supabase.auth.signOut();
           toast.error("Driver accounts must use the QR Reader app to sign in.");
           setSubmitting(false);
           return;
         }
-        if (passengerRow?.is_admin) {
+        // Check if this account is an admin — admins must use the Admin panel
+        const { data: adminRow } = await supabase
+          .from("admin_accounts")
+          .select("user_id")
+          .eq("user_id", signInData.user!.id)
+          .maybeSingle();
+        if (adminRow) {
           await supabase.auth.signOut();
           toast.error("Admin accounts must use the Admin panel to sign in.");
           setSubmitting(false);

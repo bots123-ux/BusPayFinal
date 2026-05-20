@@ -21,13 +21,23 @@ export default function ScannerProfile() {
 
   useEffect(() => {
     if (!user) return;
-    supabase.from("passenger")
-      .select("full_name, is_admin, is_driver")
+    // Check admin_accounts first, then driver_accounts for role and name
+    supabase.from("admin_accounts")
+      .select("full_name, user_id")
       .eq("user_id", user.id).maybeSingle()
-      .then(({ data }) => {
-        if (data?.full_name) setDriverName(data.full_name);
-        if (data?.is_admin) setRole("Admin");
-        else if (data?.is_driver) setRole("Driver");
+      .then(({ data: adminData }) => {
+        if (adminData) {
+          if (adminData.full_name) setDriverName(adminData.full_name);
+          setRole("Admin");
+          return;
+        }
+        supabase.from("driver_accounts")
+          .select("full_name, user_id")
+          .eq("user_id", user.id).maybeSingle()
+          .then(({ data: driverData }) => {
+            if (driverData?.full_name) setDriverName(driverData.full_name);
+            setRole("Driver");
+          });
       });
     setPromptAvailable(!!getInstallPrompt());
   }, [user]);

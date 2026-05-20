@@ -62,6 +62,41 @@ export type Database = {
         }
         Relationships: []
       }
+      driver_accounts: {
+        Row: {
+          created_at: string
+          full_name: string | null
+          id: string
+          license_number: string | null
+          phone: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          license_number?: string | null
+          phone?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          license_number?: string | null
+          phone?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_accounts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       notifications: {
         Row: {
           body: string | null
@@ -98,12 +133,8 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
-          is_admin: boolean | null
-          is_driver: boolean | null
           language: string
           phone: string | null
-          refund_count_30d: number
-          refund_window_start: string | null
           updated_at: string
           user_id: string
         }
@@ -112,12 +143,8 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
-          is_admin?: boolean | null
-          is_driver?: boolean | null
           language?: string
           phone?: string | null
-          refund_count_30d?: number
-          refund_window_start?: string | null
           updated_at?: string
           user_id: string
         }
@@ -126,12 +153,8 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
-          is_admin?: boolean | null
-          is_driver?: boolean | null
           language?: string
           phone?: string | null
-          refund_count_30d?: number
-          refund_window_start?: string | null
           updated_at?: string
           user_id?: string
         }
