@@ -228,7 +228,7 @@ export default function Auth() {
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
-                {mode === "signup" && password.length > 0 && (
+                {mode === "signup" && (
                   <div className="mt-2 rounded-xl border border-border bg-muted/40 p-3 space-y-1.5">
                     <p className="text-xs font-semibold text-foreground mb-1">Password Requirements:</p>
                     {[
