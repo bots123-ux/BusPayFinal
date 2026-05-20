@@ -26,7 +26,7 @@ const signupPasswordSchema = z
   .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
   .regex(/[^a-zA-Z0-9]/, "Password must contain at least one special character");
 const nameSchema = z.string().min(2, "Name is too short").max(80);
-type Mode = "signin" | "signup" | "forgot";
+type Mode = "signin" | "signup" | "forgot" | "reset";
 
 function formatTime(ms: number) {
   const total = Math.ceil(ms / 1000);
@@ -48,7 +48,10 @@ export default function Auth() {
   const { user } = useAuth();
   const [search] = useSearchParams();
   const redirectTo = search.get("redirect") || "/app";
-  const [mode, setMode] = useState<Mode>(search.get("mode") === "signup" ? "signup" : "signin");
+  const [mode, setMode] = useState<Mode>(
+    search.get("mode") === "signup" ? "signup" :
+    search.get("mode") === "reset" ? "reset" : "signin"
+  );
   const [submitting, setSubmitting] = useState(false);
   const [lockMs, setLockMs] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
@@ -59,7 +62,7 @@ export default function Auth() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
 
-  useEffect(() => { if (user) navigate(redirectTo, { replace: true }); }, [user, navigate, redirectTo]);
+  useEffect(() => { if (user && mode !== "reset") navigate(redirectTo, { replace: true }); }, [user, navigate, redirectTo, mode]);
 
   // Update lock state when email changes — per-email throttle
   useEffect(() => {
@@ -85,7 +88,24 @@ export default function Auth() {
     finally { setSubmitting(false); }
   };
 
-  const handleEmailSubmit = async (e: FormEvent) => {
+  const handleResetPassword = async (e: FormEvent) => {
+    e.preventDefault();
+    const pwResult = signupPasswordSchema.safeParse(password);
+    if (!pwResult.success) { toast.error(pwResult.error.errors[0]?.message || "Invalid password."); return; }
+    if (password !== confirmPassword) { toast.error("Passwords do not match."); return; }
+    setSubmitting(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) throw error;
+      toast.success("Password updated! Please sign in.");
+      await supabase.auth.signOut();
+      setPassword(""); setConfirmPassword("");
+      setMode("signin");
+    } catch (err: any) { toast.error(friendlyError(err?.message)); }
+    finally { setSubmitting(false); }
+  };
+
+
     e.preventDefault();
     if (isLocked) return;
     const cleanEmail = sanitizeEmail(email);
@@ -163,7 +183,84 @@ export default function Auth() {
     </main>
   );
 
-  return (
+  if (mode === "reset") return (
+    <main className="min-h-screen bg-background">
+      <div className="mx-auto flex min-h-screen max-w-md flex-col px-6 py-8">
+        <header className="mb-8 animate-fade-in"><Logo /></header>
+        <section className="flex-1">
+          <h1 className="mb-2 text-3xl font-extrabold">Set new password</h1>
+          <p className="mb-6 text-sm text-muted-foreground">Enter your new password below.</p>
+          <form onSubmit={handleResetPassword} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="reset-password">New Password <span className="text-destructive">*</span></Label>
+              <div className="relative">
+                <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input id="reset-password" type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  value={password} onChange={(e) => setPassword(e.target.value)}
+                  maxLength={128} required className="h-12 rounded-xl pl-10 pr-10" placeholder="••••••••" />
+                <button type="button"
+                  onMouseDown={(e) => { e.preventDefault(); setShowPassword(p => !p); }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none">
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              <div className="mt-2 rounded-xl border border-border bg-muted/40 p-3 space-y-1.5">
+                <p className="text-xs font-semibold text-foreground mb-1">Password Requirements:</p>
+                {[
+                  { label: "At least 8 characters", met: password.length >= 8 },
+                  { label: "One uppercase letter (A-Z)", met: /[A-Z]/.test(password) },
+                  { label: "One lowercase letter (a-z)", met: /[a-z]/.test(password) },
+                  { label: "One number (0-9)", met: /[0-9]/.test(password) },
+                  { label: "One special character (!@#$%^&*…)", met: /[^a-zA-Z0-9]/.test(password) },
+                ].map(({ label, met }) => (
+                  <div key={label} className="flex items-center gap-2">
+                    <span className={cn("flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full text-[10px]", met ? "text-emerald-500" : "text-muted-foreground")}>
+                      {met ? (
+                        <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" xmlns="http://www.w3.org/2000/svg">
+                          <circle cx="8" cy="8" r="7.5" stroke="currentColor"/>
+                          <path d="M5 8l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      ) : (
+                        <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" xmlns="http://www.w3.org/2000/svg">
+                          <circle cx="8" cy="8" r="7.5" stroke="currentColor"/>
+                          <path d="M6 6l4 4M10 6l-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                        </svg>
+                      )}
+                    </span>
+                    <span className={cn("text-xs", met ? "text-emerald-500 font-medium" : "text-muted-foreground")}>{label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="reset-confirm-password">Confirm New Password <span className="text-destructive">*</span></Label>
+              <div className="relative">
+                <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input id="reset-confirm-password" type={showConfirmPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
+                  maxLength={128} required className="h-12 rounded-xl pl-10 pr-10" placeholder="••••••••" />
+                <button type="button"
+                  onMouseDown={(e) => { e.preventDefault(); setShowConfirmPassword(p => !p); }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none">
+                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {confirmPassword && password !== confirmPassword && (
+                <p className="text-xs text-destructive">Passwords do not match.</p>
+              )}
+            </div>
+            <Button type="submit" variant="navy" size="lg" className="w-full" disabled={submitting}>
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Update Password"}
+            </Button>
+          </form>
+        </section>
+      </div>
+    </main>
+  );
+
+
     <main className="min-h-screen bg-background">
       <div className="mx-auto flex min-h-screen max-w-md flex-col px-6 py-8">
         <header className="mb-8 animate-fade-in"><Logo /></header>
