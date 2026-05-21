@@ -371,19 +371,21 @@ export default function Booking() {
     try {
       const ticketIds: string[] = [];
       for (const seatNum of selectedSeats) {
-        const { data: ticketRow, error: tErr } = await supabase.from("ticket")
-          .insert({ user_id: user.id, trip_id: trip.id, seat_number: seatNum, status: "pending", price_php: price })
-          .select("id").single();
-        if (tErr) throw tErr;
-        await supabase.from("ticket").update({ qr_code: `BUSPAY:${ticketRow.id}` }).eq("id", ticketRow.id);
-        // confirm_ticket_payment handles wallet deduction atomically for wallet payments.
-        // Do NOT call deduct_wallet separately — that would cause a double charge.
-        const { data: confirmed, error: cErr } = await supabase.rpc("confirm_ticket_payment", {
-          p_ticket_id: ticketRow.id, p_payment_method: method === "card" ? "gcash" : method, p_amount: price,
+        // book_and_pay_ticket is a SECURITY DEFINER function that atomically:
+        //   1. Claims the seat (unique partial index prevents double-booking)
+        //   2. Deducts wallet (if applicable) inside the same transaction
+        //   3. Records the payment and marks the ticket paid
+        // Never insert into ticket or call confirm_ticket_payment directly.
+        const { data: result, error: rErr } = await supabase.rpc("book_and_pay_ticket", {
+          p_trip_id:        trip.id,
+          p_seat_number:    seatNum,
+          p_payment_method: method, // 'gcash' | 'wallet' | 'card' — passed as-is, no remapping
+          p_amount:         price,
         });
-        if (cErr) throw cErr;
-        if (!confirmed) throw new Error("Payment confirmation failed");
-        ticketIds.push(ticketRow.id);
+        if (rErr) throw rErr;
+        const res = result as { ok: boolean; ticket_id?: string; reason?: string };
+        if (!res.ok) throw new Error(res.reason ?? "Booking failed");
+        ticketIds.push(res.ticket_id!);
       }
       if (method === "wallet") {
         setWalletBalance((b) => b - totalPrice);
