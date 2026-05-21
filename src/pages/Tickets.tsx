@@ -45,7 +45,7 @@ export default function Tickets() {
   const [ticketConfirmId, setTicketConfirmId] = useState<string | null>(null);
 
   const deleteTicket = async (id: string) => {
-    const { error } = await supabase.from("ticket").delete().eq("id", id);
+    const { error } = await supabase.rpc("hide_ticket", { p_ticket_id: id });
     if (error) { console.error(error); return; }
     setTickets((prev) => prev.filter((t) => t.id !== id));
     setTicketConfirmId(null);
@@ -66,6 +66,7 @@ export default function Tickets() {
       .from("ticket")
       .select("id, seat_number, status, price_php, created_at, trips(travel_date, departure_time, routes(origin, destination))")
       .eq("user_id", user.id)
+      .eq("hidden", false)
       .order("created_at", { ascending: false });
     if (error) console.error("Tickets error:", error);
     if (mountedRef.current) {
