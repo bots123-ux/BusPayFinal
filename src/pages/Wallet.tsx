@@ -406,10 +406,7 @@ export default function Wallet() {
   const [txConfirmId, setTxConfirmId] = useState<string | null>(null);
 
   const hideTx = async (id: string) => {
-    const { error } = await supabase
-      .from("wallet_transactions")
-      .update({ hidden: true })
-      .eq("id", id);
+    const { error } = await supabase.rpc("hide_wallet_transaction", { p_tx_id: id });
     if (error) { toast.error("Failed to remove transaction"); return; }
     setTxs((prev) => prev.filter((t) => t.id !== id));
     setTxConfirmId(null);
