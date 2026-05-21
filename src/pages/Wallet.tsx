@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { Plus, ArrowDownLeft, ArrowUpRight, CreditCard, Smartphone, Loader2, X, ChevronRight, Check, Calendar, ChevronLeft } from "lucide-react";
+import { Plus, ArrowDownLeft, ArrowUpRight, CreditCard, Smartphone, Loader2, X, ChevronRight, Check, Calendar, ChevronLeft, MoreVertical, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,6 +18,7 @@ interface Tx {
   amount_php: number;
   description: string | null;
   created_at: string;
+  hidden: boolean;
 }
 
 interface PaymentMethod {
@@ -398,11 +399,29 @@ export default function Wallet() {
   const [bankName, setBankName] = useState("BDO");
 
 
+  // ── Transaction hide state ─────────────────────────────────────────────
+  // Sets hidden=true on the DB row — record stays permanently, just hidden from passenger view.
+  // Admin panel always sees all records regardless of hidden flag.
+  const [txMenuOpen, setTxMenuOpen] = useState<string | null>(null);
+  const [txConfirmId, setTxConfirmId] = useState<string | null>(null);
+
+  const hideTx = async (id: string) => {
+    const { error } = await supabase
+      .from("wallet_transactions")
+      .update({ hidden: true })
+      .eq("id", id);
+    if (error) { toast.error("Failed to remove transaction"); return; }
+    setTxs((prev) => prev.filter((t) => t.id !== id));
+    setTxConfirmId(null);
+    setTxMenuOpen(null);
+    toast.success("Transaction removed from your view");
+  };
+
   const load = async () => {
     if (!user) return;
     const [{ data: w }, { data: txData }, { data: pmData }] = await Promise.all([
       supabase.from("wallet").select("balance_php").eq("user_id", user.id).maybeSingle(),
-      supabase.from("wallet_transactions").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50),
+      supabase.from("wallet_transactions").select("*").eq("user_id", user.id).eq("hidden", false).order("created_at", { ascending: false }).limit(50),
       supabase.from("payment_methods").select("*").eq("user_id", user.id),
     ]);
     setBalance(Number(w?.balance_php ?? 0));
@@ -414,6 +433,14 @@ export default function Wallet() {
   useEffect(() => { load(); }, [user]);
 
   const savedGcash = savedMethods.find((m) => m.type === "gcash");
+
+  // Close tx menu on outside click
+  useEffect(() => {
+    if (!txMenuOpen) return;
+    const handler = () => setTxMenuOpen(null);
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
+  }, [txMenuOpen]);
   const savedCard = savedMethods.find((m) => m.type === "card");
 
   const openTopup = () => {
@@ -687,8 +714,10 @@ export default function Wallet() {
             {txs.map((tx) => {
               const displayAmt = tx.type === "payment" ? -Math.abs(tx.amount_php) : Math.abs(tx.amount_php);
               const positive = displayAmt >= 0;
+              const isMenuOpen = txMenuOpen === tx.id;
+              const isConfirming = txConfirmId === tx.id;
               return (
-                <li key={tx.id} className="flex items-center gap-4 rounded-2xl border border-border bg-card p-4">
+                <li key={tx.id} className="relative flex items-center gap-4 rounded-2xl border border-border bg-card p-4">
                   <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl shrink-0", positive ? "bg-success/15 text-success" : "bg-destructive/10 text-destructive")}>
                     {positive ? <ArrowDownLeft className="h-5 w-5" /> : <ArrowUpRight className="h-5 w-5" />}
                   </div>
@@ -699,6 +728,55 @@ export default function Wallet() {
                   <div className={cn("font-bold shrink-0", positive ? "text-success" : "text-foreground")}>
                     {positive ? "+" : ""}₱{Math.abs(displayAmt).toLocaleString()}
                   </div>
+
+                  {/* 3-dot button */}
+                  {!isConfirming && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setTxMenuOpen(isMenuOpen ? null : tx.id); }}
+                      className="shrink-0 rounded-full p-1 hover:bg-secondary transition-colors"
+                    >
+                      <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  )}
+
+                  {/* Inline menu */}
+                  {isMenuOpen && !isConfirming && (
+                    <div className="absolute right-2 top-12 z-20 flex flex-col gap-1 rounded-2xl border border-border bg-card shadow-elevated p-2 min-w-[140px] animate-fade-in">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setTxConfirmId(tx.id); setTxMenuOpen(null); }}
+                        className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-destructive hover:bg-destructive/10 transition-colors"
+                      >
+                        <Trash2 className="h-4 w-4" /> Delete
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setTxMenuOpen(null); }}
+                        className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-secondary transition-colors"
+                      >
+                        <X className="h-4 w-4" /> Cancel
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Confirm delete row */}
+                  {isConfirming && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-between gap-2 rounded-2xl bg-destructive/10 border border-destructive/30 px-4 animate-fade-in">
+                      <span className="text-sm font-semibold text-destructive"></span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setTxConfirmId(null)}
+                          className="rounded-xl border border-border bg-card px-3 py-1.5 text-xs font-semibold hover:bg-secondary transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => hideTx(tx.id)}
+                          className="rounded-xl bg-destructive px-3 py-1.5 text-xs font-bold text-white hover:bg-destructive/80 transition-colors"
+                        >
+                          Confirm Delete
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </li>
               );
             })}
